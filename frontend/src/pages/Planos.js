@@ -25,13 +25,13 @@ const Planos = () => {
     duracao_meses: 1
   });
 
-  const modalidadesOptions = [
+  const modalidadesOptions = React.useMemo(() => [
     { id: 'crossfit', label: 'CrossFit' },
     { id: 'musculacao', label: 'Musculação' },
     { id: 'profissional', label: 'Treinamento Profissional' },
     { id: 'funcional', label: 'Funcional' },
     { id: 'yoga', label: 'Yoga' },
-  ];
+  ], []);
 
   useEffect(() => {
     loadPlanos();
