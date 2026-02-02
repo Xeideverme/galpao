@@ -108,10 +108,6 @@ const Aulas = () => {
     });
   };
 
-  const getAulasPorDia = (diaValue) => {
-    return aulas.filter(aula => aula.dia_semana === diaValue);
-  };
-
   if (loading) {
     return <div className="text-center py-8">Carregando...</div>;
   }
@@ -223,64 +219,57 @@ const Aulas = () => {
 
       {success && <Alert data-testid="success-alert"><AlertDescription>{success}</AlertDescription></Alert>}
 
-      <div className="space-y-6">
-        {DIAS_SEMANA.map(dia => {
-          const aulasDoDia = getAulasPorDia(dia.value);
-          return (
-            <div key={dia.value}>
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
-                {dia.label}
-              </h3>
-              {aulasDoDia.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {aulasDoDia.map((aula) => (
-                    <Card key={aula.id} data-testid={`aula-card-${aula.id}`}>
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <CardTitle className="text-lg">{aula.nome}</CardTitle>
-                            <Badge variant="outline" className="mt-1">{aula.modalidade}</Badge>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Clock className="h-4 w-4" />
-                          <span>{aula.horario}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Users className="h-4 w-4" />
-                          <span>Cap: {aula.capacidade_maxima} alunos</span>
-                        </div>
-                        <div className="pt-2 border-t">
-                          <p className="text-sm text-gray-600">
-                            Professor: <span className="font-medium">{aula.professor_nome}</span>
-                          </p>
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="w-full mt-2"
-                          onClick={() => handleDelete(aula.id)}
-                          data-testid={`delete-aula-${aula.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" /> Excluir
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="py-6 text-center text-gray-500">
-                    Nenhuma aula cadastrada para este dia
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          );
-        })}
+      <div className="space-y-4">
+        {aulas.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {aulas.map((aula) => (
+              <Card key={aula.id} data-testid={`aula-card-${aula.id}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-lg">{aula.nome}</CardTitle>
+                      <Badge variant="outline" className="mt-1">{aula.modalidade}</Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Calendar className="h-4 w-4" />
+                    <span className="capitalize">{aula.dia_semana}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Clock className="h-4 w-4" />
+                    <span>{aula.horario}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Users className="h-4 w-4" />
+                    <span>Cap: {aula.capacidade_maxima} alunos</span>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <p className="text-sm text-gray-600">
+                      Professor: <span className="font-medium">{aula.professor_nome}</span>
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => handleDelete(aula.id)}
+                    data-testid={`delete-aula-${aula.id}`}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" /> Excluir
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="py-8 text-center text-gray-500">
+              Nenhuma aula cadastrada
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
