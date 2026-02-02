@@ -146,19 +146,51 @@ const Professores = () => {
               <div>
                 <Label>Especialidades</Label>
                 <div className="grid grid-cols-2 gap-3 mt-2">
-                  {ESPECIALIDADES.map(especialidade => (
-                    <div key={especialidade.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`esp-${especialidade.id}`}
-                        data-testid={`especialidade-${especialidade.id}`}
-                        checked={formData.especialidades.includes(especialidade.id)}
-                        onCheckedChange={() => handleEspecialidadeToggle(especialidade.id)}
-                      />
-                      <label htmlFor={`esp-${especialidade.id}`} className="text-sm cursor-pointer">
-                        {especialidade.label}
-                      </label>
-                    </div>
-                  ))}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="esp-crossfit"
+                      data-testid="especialidade-crossfit"
+                      checked={formData.especialidades.includes('crossfit')}
+                      onCheckedChange={() => handleEspecialidadeToggle('crossfit')}
+                    />
+                    <label htmlFor="esp-crossfit" className="text-sm cursor-pointer">CrossFit</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="esp-musculacao"
+                      data-testid="especialidade-musculacao"
+                      checked={formData.especialidades.includes('musculacao')}
+                      onCheckedChange={() => handleEspecialidadeToggle('musculacao')}
+                    />
+                    <label htmlFor="esp-musculacao" className="text-sm cursor-pointer">Musculação</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="esp-profissional"
+                      data-testid="especialidade-profissional"
+                      checked={formData.especialidades.includes('profissional')}
+                      onCheckedChange={() => handleEspecialidadeToggle('profissional')}
+                    />
+                    <label htmlFor="esp-profissional" className="text-sm cursor-pointer">Treinamento Profissional</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="esp-funcional"
+                      data-testid="especialidade-funcional"
+                      checked={formData.especialidades.includes('funcional')}
+                      onCheckedChange={() => handleEspecialidadeToggle('funcional')}
+                    />
+                    <label htmlFor="esp-funcional" className="text-sm cursor-pointer">Funcional</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="esp-yoga"
+                      data-testid="especialidade-yoga"
+                      checked={formData.especialidades.includes('yoga')}
+                      onCheckedChange={() => handleEspecialidadeToggle('yoga')}
+                    />
+                    <label htmlFor="esp-yoga" className="text-sm cursor-pointer">Yoga</label>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
