@@ -117,6 +117,21 @@ const Dashboard = () => {
         </Card>
       </div>
 
+      {/* Card de Avaliações */}
+      {(stats?.avaliacoes_mes || 0) > 0 && (
+        <Card className="border-purple-200 bg-purple-50">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <Activity className="h-5 w-5 text-purple-600" />
+            <div>
+              <CardTitle className="text-purple-900">Avaliações Físicas</CardTitle>
+              <CardDescription className="text-purple-700">
+                {stats.avaliacoes_mes} avaliação(ões) realizada(s) este mês
+              </CardDescription>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
       {/* Pendencias */}
       {(stats?.pagamentos_pendentes || 0) > 0 && (
         <Card className="border-orange-200 bg-orange-50" data-testid="card-pendencias">
