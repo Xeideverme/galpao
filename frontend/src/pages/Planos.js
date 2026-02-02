@@ -10,6 +10,14 @@ import { Plus, Edit, Trash2, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 
+const MODALIDADES = [
+  { id: 'crossfit', label: 'CrossFit' },
+  { id: 'musculacao', label: 'Musculação' },
+  { id: 'profissional', label: 'Treinamento Profissional' },
+  { id: 'funcional', label: 'Funcional' },
+  { id: 'yoga', label: 'Yoga' },
+];
+
 const Planos = () => {
   const [planos, setPlanos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,14 +32,6 @@ const Planos = () => {
     modalidades: [],
     duracao_meses: 1
   });
-
-  const modalidadesOptions = React.useMemo(() => [
-    { id: 'crossfit', label: 'CrossFit' },
-    { id: 'musculacao', label: 'Musculação' },
-    { id: 'profissional', label: 'Treinamento Profissional' },
-    { id: 'funcional', label: 'Funcional' },
-    { id: 'yoga', label: 'Yoga' },
-  ], []);
 
   useEffect(() => {
     loadPlanos();
@@ -92,12 +92,11 @@ const Planos = () => {
   };
 
   const handleModalidadeToggle = (modalidadeId) => {
-    setFormData(prev => ({
-      ...prev,
-      modalidades: prev.modalidades.includes(modalidadeId)
-        ? prev.modalidades.filter(m => m !== modalidadeId)
-        : [...prev.modalidades, modalidadeId]
-    }));
+    const newModalidades = formData.modalidades.includes(modalidadeId)
+      ? formData.modalidades.filter(m => m !== modalidadeId)
+      : [...formData.modalidades, modalidadeId];
+    
+    setFormData({ ...formData, modalidades: newModalidades });
   };
 
   if (loading) {
@@ -176,7 +175,7 @@ const Planos = () => {
                 <div className="col-span-2">
                   <Label>Modalidades Incluídas</Label>
                   <div className="grid grid-cols-2 gap-3 mt-2">
-                    {modalidadesOptions.map(modalidade => (
+                    {MODALIDADES.map(modalidade => (
                       <div key={modalidade.id} className="flex items-center space-x-2">
                         <Checkbox
                           id={modalidade.id}
@@ -207,7 +206,6 @@ const Planos = () => {
         </Alert>
       )}
 
-      {/* Planos Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {planos.map((plano) => (
           <Card key={plano.id} data-testid={`plano-card-${plano.id}`} className="relative hover:shadow-lg transition-shadow">
