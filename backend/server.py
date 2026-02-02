@@ -944,6 +944,10 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
     # Taxa de ocupação (exemplo: 100 alunos = 100%)
     taxa_ocupacao = min((alunos_ativos / 100) * 100, 100) if alunos_ativos else 0
     
+    # Avaliações do mês
+    avaliacoes = await db.avaliacoes_fisicas.find({}, {"_id": 0}).to_list(10000)
+    avaliacoes_mes = sum(1 for a in avaliacoes if a.get('data_avaliacao', '').startswith(mes_atual))
+    
     return DashboardStats(
         total_alunos=total_alunos,
         alunos_ativos=alunos_ativos,
@@ -952,7 +956,8 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         despesa_mensal=despesa_mensal,
         checkins_hoje=checkins_hoje,
         pagamentos_pendentes=pagamentos_pendentes,
-        taxa_ocupacao=round(taxa_ocupacao, 2)
+        taxa_ocupacao=round(taxa_ocupacao, 2),
+        avaliacoes_mes=avaliacoes_mes
     )
 
 # ==================== ROOT ROUTES ====================
