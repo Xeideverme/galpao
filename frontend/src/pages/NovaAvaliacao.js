@@ -121,53 +121,53 @@ const NovaAvaliacao = () => {
   };
 
   if (loading) {
-    return <div className=\"text-center py-8\">Carregando...</div>;
+    return <div className="text-center py-8">Carregando...</div>;
   }
 
   const imc = calcularIMC();
 
   return (
-    <div className=\"space-y-6\" data-testid=\"nova-avaliacao-page\">
-      <div className=\"flex items-center gap-4\">
-        <Button variant=\"outline\" onClick={() => navigate('/avaliacoes')}>
-          <ArrowLeft className=\"h-4 w-4 mr-2\" /> Voltar
+    <div className="space-y-6" data-testid="nova-avaliacao-page">
+      <div className="flex items-center gap-4">
+        <Button variant="outline" onClick={() => navigate('/avaliacoes')}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
         </Button>
         <div>
-          <h1 className=\"text-3xl font-bold text-gray-900\">Nova Avaliação Física</h1>
-          <p className=\"text-gray-500 mt-1\">Registre uma nova avaliação física</p>
+          <h1 className="text-3xl font-bold text-gray-900">Nova Avaliação Física</h1>
+          <p className="text-gray-500 mt-1">Registre uma nova avaliação física</p>
         </div>
       </div>
 
       {error && (
-        <Alert variant=\"destructive\">
+        <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {success && (
-        <Alert data-testid=\"success-alert\">
+        <Alert data-testid="success-alert">
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit} className=\"space-y-6\">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Informações Básicas */}
         <Card>
           <CardHeader>
             <CardTitle>Informações Básicas</CardTitle>
             <CardDescription>Dados do aluno e avaliação</CardDescription>
           </CardHeader>
-          <CardContent className=\"space-y-4\">
-            <div className=\"grid grid-cols-2 gap-4\">
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor=\"aluno_id\">Aluno *</Label>
+                <Label htmlFor="aluno_id">Aluno *</Label>
                 <Select 
                   value={formData.aluno_id} 
                   onValueChange={(value) => setFormData({ ...formData, aluno_id: value })}
                   required
                 >
-                  <SelectTrigger data-testid=\"select-aluno\">
-                    <SelectValue placeholder=\"Selecione o aluno\" />
+                  <SelectTrigger data-testid="select-aluno">
+                    <SelectValue placeholder="Selecione o aluno" />
                   </SelectTrigger>
                   <SelectContent>
                     {alunos.map(aluno => (
@@ -178,14 +178,14 @@ const NovaAvaliacao = () => {
               </div>
 
               <div>
-                <Label htmlFor=\"professor_id\">Professor *</Label>
+                <Label htmlFor="professor_id">Professor *</Label>
                 <Select 
                   value={formData.professor_id} 
                   onValueChange={(value) => setFormData({ ...formData, professor_id: value })}
                   required
                 >
-                  <SelectTrigger data-testid=\"select-professor\">
-                    <SelectValue placeholder=\"Selecione o professor\" />
+                  <SelectTrigger data-testid="select-professor">
+                    <SelectValue placeholder="Selecione o professor" />
                   </SelectTrigger>
                   <SelectContent>
                     {professores.map(prof => (
@@ -196,11 +196,11 @@ const NovaAvaliacao = () => {
               </div>
 
               <div>
-                <Label htmlFor=\"data_avaliacao\">Data da Avaliação *</Label>
+                <Label htmlFor="data_avaliacao">Data da Avaliação *</Label>
                 <Input
-                  id=\"data_avaliacao\"
-                  data-testid=\"data-avaliacao\"
-                  type=\"date\"
+                  id="data_avaliacao"
+                  data-testid="data-avaliacao"
+                  type="date"
                   value={formData.data_avaliacao}
                   onChange={(e) => setFormData({ ...formData, data_avaliacao: e.target.value })}
                   required
@@ -216,74 +216,74 @@ const NovaAvaliacao = () => {
             <CardTitle>Medidas Básicas</CardTitle>
             <CardDescription>Peso, altura e composição corporal</CardDescription>
           </CardHeader>
-          <CardContent className=\"space-y-4\">
-            <div className=\"grid grid-cols-4 gap-4\">
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-4 gap-4">
               <div>
-                <Label htmlFor=\"peso\">Peso (kg) *</Label>
+                <Label htmlFor="peso">Peso (kg) *</Label>
                 <Input
-                  id=\"peso\"
-                  data-testid=\"input-peso\"
-                  type=\"number\"
-                  step=\"0.1\"
-                  min=\"30\"
-                  max=\"300\"
+                  id="peso"
+                  data-testid="input-peso"
+                  type="number"
+                  step="0.1"
+                  min="30"
+                  max="300"
                   value={formData.peso}
                   onChange={(e) => setFormData({ ...formData, peso: e.target.value })}
-                  placeholder=\"70.5\"
+                  placeholder="70.5"
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor=\"altura\">Altura (cm) *</Label>
+                <Label htmlFor="altura">Altura (cm) *</Label>
                 <Input
-                  id=\"altura\"
-                  data-testid=\"input-altura\"
-                  type=\"number\"
-                  step=\"0.1\"
-                  min=\"100\"
-                  max=\"250\"
+                  id="altura"
+                  data-testid="input-altura"
+                  type="number"
+                  step="0.1"
+                  min="100"
+                  max="250"
                   value={formData.altura}
                   onChange={(e) => setFormData({ ...formData, altura: e.target.value })}
-                  placeholder=\"170\"
+                  placeholder="170"
                   required
                 />
               </div>
 
               <div>
                 <Label>IMC (calculado)</Label>
-                <div className=\"h-10 flex items-center px-3 bg-gray-50 rounded-md border text-lg font-bold\">
+                <div className="h-10 flex items-center px-3 bg-gray-50 rounded-md border text-lg font-bold">
                   {imc}
                 </div>
               </div>
             </div>
 
-            <div className=\"grid grid-cols-2 gap-4\">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor=\"percentual_gordura\">% Gordura</Label>
+                <Label htmlFor="percentual_gordura">% Gordura</Label>
                 <Input
-                  id=\"percentual_gordura\"
-                  data-testid=\"input-gordura\"
-                  type=\"number\"
-                  step=\"0.1\"
-                  min=\"3\"
-                  max=\"60\"
+                  id="percentual_gordura"
+                  data-testid="input-gordura"
+                  type="number"
+                  step="0.1"
+                  min="3"
+                  max="60"
                   value={formData.percentual_gordura}
                   onChange={(e) => setFormData({ ...formData, percentual_gordura: e.target.value })}
-                  placeholder=\"15.5\"
+                  placeholder="15.5"
                 />
               </div>
 
               <div>
-                <Label htmlFor=\"massa_magra\">Massa Magra (kg)</Label>
+                <Label htmlFor="massa_magra">Massa Magra (kg)</Label>
                 <Input
-                  id=\"massa_magra\"
-                  data-testid=\"input-massa-magra\"
-                  type=\"number\"
-                  step=\"0.1\"
+                  id="massa_magra"
+                  data-testid="input-massa-magra"
+                  type="number"
+                  step="0.1"
                   value={formData.massa_magra}
                   onChange={(e) => setFormData({ ...formData, massa_magra: e.target.value })}
-                  placeholder=\"60.0\"
+                  placeholder="60.0"
                 />
               </div>
             </div>
@@ -297,83 +297,83 @@ const NovaAvaliacao = () => {
             <CardDescription>Medidas em centímetros</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className=\"grid grid-cols-3 gap-4\">
+            <div className="grid grid-cols-3 gap-4">
               <CircunferenciaInput 
-                label=\"Pescoço\" 
-                id=\"pescoco\" 
+                label="Pescoço" 
+                id="pescoco" 
                 value={circunferencias.pescoco}
                 onChange={(v) => setCircunferencias({...circunferencias, pescoco: v})}
-                testId=\"circ-pescoco\"
+                testId="circ-pescoco"
               />
               <CircunferenciaInput 
-                label=\"Tórax\" 
-                id=\"torax\" 
+                label="Tórax" 
+                id="torax" 
                 value={circunferencias.torax}
                 onChange={(v) => setCircunferencias({...circunferencias, torax: v})}
-                testId=\"circ-torax\"
+                testId="circ-torax"
               />
               <CircunferenciaInput 
-                label=\"Cintura\" 
-                id=\"cintura\" 
+                label="Cintura" 
+                id="cintura" 
                 value={circunferencias.cintura}
                 onChange={(v) => setCircunferencias({...circunferencias, cintura: v})}
-                testId=\"circ-cintura\"
+                testId="circ-cintura"
               />
               <CircunferenciaInput 
-                label=\"Abdômen\" 
-                id=\"abdomen\" 
+                label="Abdômen" 
+                id="abdomen" 
                 value={circunferencias.abdomen}
                 onChange={(v) => setCircunferencias({...circunferencias, abdomen: v})}
-                testId=\"circ-abdomen\"
+                testId="circ-abdomen"
               />
               <CircunferenciaInput 
-                label=\"Quadril\" 
-                id=\"quadril\" 
+                label="Quadril" 
+                id="quadril" 
                 value={circunferencias.quadril}
                 onChange={(v) => setCircunferencias({...circunferencias, quadril: v})}
-                testId=\"circ-quadril\"
+                testId="circ-quadril"
               />
               <CircunferenciaInput 
-                label=\"Braço Direito\" 
-                id=\"braco_direito\" 
+                label="Braço Direito" 
+                id="braco_direito" 
                 value={circunferencias.braco_direito}
                 onChange={(v) => setCircunferencias({...circunferencias, braco_direito: v})}
-                testId=\"circ-braco-direito\"
+                testId="circ-braco-direito"
               />
               <CircunferenciaInput 
-                label=\"Braço Esquerdo\" 
-                id=\"braco_esquerdo\" 
+                label="Braço Esquerdo" 
+                id="braco_esquerdo" 
                 value={circunferencias.braco_esquerdo}
                 onChange={(v) => setCircunferencias({...circunferencias, braco_esquerdo: v})}
-                testId=\"circ-braco-esquerdo\"
+                testId="circ-braco-esquerdo"
               />
               <CircunferenciaInput 
-                label=\"Coxa Direita\" 
-                id=\"coxa_direita\" 
+                label="Coxa Direita" 
+                id="coxa_direita" 
                 value={circunferencias.coxa_direita}
                 onChange={(v) => setCircunferencias({...circunferencias, coxa_direita: v})}
-                testId=\"circ-coxa-direita\"
+                testId="circ-coxa-direita"
               />
               <CircunferenciaInput 
-                label=\"Coxa Esquerda\" 
-                id=\"coxa_esquerda\" 
+                label="Coxa Esquerda" 
+                id="coxa_esquerda" 
                 value={circunferencias.coxa_esquerda}
                 onChange={(v) => setCircunferencias({...circunferencias, coxa_esquerda: v})}
-                testId=\"circ-coxa-esquerda\"
+                testId="circ-coxa-esquerda"
               />
               <CircunferenciaInput 
-                label=\"Panturrilha Direita\" 
-                id=\"panturrilha_direita\" 
+                label="Panturrilha Direita" 
+                id="panturrilha_direita" 
                 value={circunferencias.panturrilha_direita}
                 onChange={(v) => setCircunferencias({...circunferencias, panturrilha_direita: v})}
-                testId=\"circ-panturrilha-direita\"
+                testId="circ-panturrilha-direita"
               />
               <CircunferenciaInput 
-                label=\"Panturrilha Esquerda\" 
-                id=\"panturrilha_esquerda\" 
+                label="Panturrilha Esquerda" 
+                id="panturrilha_esquerda" 
                 value={circunferencias.panturrilha_esquerda}
                 onChange={(v) => setCircunferencias({...circunferencias, panturrilha_esquerda: v})}
-                testId=\"circ-panturrilha-esquerda\"
+                testId="circ-panturrilha-esquerda"
               />
             </div>
           </CardContent>
@@ -386,48 +386,48 @@ const NovaAvaliacao = () => {
             <CardDescription>Protocolo de 7 dobras em milímetros</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className=\"grid grid-cols-3 gap-4\">
+            <div className="grid grid-cols-3 gap-4">
               <CircunferenciaInput 
-                label=\"Tríceps\" 
-                id=\"triceps\" 
+                label="Tríceps" 
+                id="triceps" 
                 value={dobrasCutaneas.triceps}
                 onChange={(v) => setDobrasCutaneas({...dobrasCutaneas, triceps: v})}
-                testId=\"dobra-triceps\"
+                testId="dobra-triceps"
               />
               <CircunferenciaInput 
-                label=\"Subescapular\" 
-                id=\"subescapular\" 
+                label="Subescapular" 
+                id="subescapular" 
                 value={dobrasCutaneas.subescapular}
                 onChange={(v) => setDobrasCutaneas({...dobrasCutaneas, subescapular: v})}
-                testId=\"dobra-subescapular\"
+                testId="dobra-subescapular"
               />
               <CircunferenciaInput 
-                label=\"Bíceps\" 
-                id=\"biceps\" 
+                label="Bíceps" 
+                id="biceps" 
                 value={dobrasCutaneas.biceps}
                 onChange={(v) => setDobrasCutaneas({...dobrasCutaneas, biceps: v})}
-                testId=\"dobra-biceps\"
+                testId="dobra-biceps"
               />
               <CircunferenciaInput 
-                label=\"Supraíliaca\" 
-                id=\"suprailiaca\" 
+                label="Supraíliaca" 
+                id="suprailiaca" 
                 value={dobrasCutaneas.suprailiaca}
                 onChange={(v) => setDobrasCutaneas({...dobrasCutaneas, suprailiaca: v})}
-                testId=\"dobra-suprailiaca\"
+                testId="dobra-suprailiaca"
               />
               <CircunferenciaInput 
-                label=\"Abdominal\" 
-                id=\"abdominal\" 
+                label="Abdominal" 
+                id="abdominal" 
                 value={dobrasCutaneas.abdominal}
                 onChange={(v) => setDobrasCutaneas({...dobrasCutaneas, abdominal: v})}
-                testId=\"dobra-abdominal\"
+                testId="dobra-abdominal"
               />
               <CircunferenciaInput 
-                label=\"Coxa\" 
-                id=\"coxa\" 
+                label="Coxa" 
+                id="coxa" 
                 value={dobrasCutaneas.coxa}
                 onChange={(v) => setDobrasCutaneas({...dobrasCutaneas, coxa: v})}
-                testId=\"dobra-coxa\"
+                testId="dobra-coxa"
               />
             </div>
           </CardContent>
@@ -449,26 +449,26 @@ const NovaAvaliacao = () => {
           <CardHeader>
             <CardTitle>Observações e Objetivos</CardTitle>
           </CardHeader>
-          <CardContent className=\"space-y-4\">
+          <CardContent className="space-y-4">
             <div>
-              <Label htmlFor=\"observacoes\">Observações</Label>
+              <Label htmlFor="observacoes">Observações</Label>
               <Textarea
-                id=\"observacoes\"
-                data-testid=\"input-observacoes\"
+                id="observacoes"
+                data-testid="input-observacoes"
                 value={formData.observacoes}
                 onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                placeholder=\"Observações sobre a avaliação...\"
+                placeholder="Observações sobre a avaliação..."
                 rows={3}
               />
             </div>
             <div>
-              <Label htmlFor=\"objetivos\">Objetivos do Aluno</Label>
+              <Label htmlFor="objetivos">Objetivos do Aluno</Label>
               <Textarea
-                id=\"objetivos\"
-                data-testid=\"input-objetivos\"
+                id="objetivos"
+                data-testid="input-objetivos"
                 value={formData.objetivos}
                 onChange={(e) => setFormData({ ...formData, objetivos: e.target.value })}
-                placeholder=\"Objetivos e metas...\"
+                placeholder="Objetivos e metas..."
                 rows={3}
               />
             </div>
@@ -476,20 +476,20 @@ const NovaAvaliacao = () => {
         </Card>
 
         {/* Botões */}
-        <div className=\"flex gap-4\">
+        <div className="flex gap-4">
           <Button 
-            type=\"button\" 
-            variant=\"outline\" 
+            type="button" 
+            variant="outline" 
             onClick={() => navigate('/avaliacoes')}
           >
             Cancelar
           </Button>
           <Button 
-            type=\"submit\" 
+            type="submit" 
             disabled={salvando}
-            data-testid=\"salvar-avaliacao-btn\"
+            data-testid="salvar-avaliacao-btn"
           >
-            <Save className=\"mr-2 h-4 w-4\" />
+            <Save className="mr-2 h-4 w-4" />
             {salvando ? 'Salvando...' : 'Salvar Avaliação'}
           </Button>
         </div>
