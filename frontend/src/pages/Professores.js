@@ -10,6 +10,14 @@ import { Plus, GraduationCap, Mail, Phone, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 
+const ESPECIALIDADES = [
+  { id: 'crossfit', label: 'CrossFit' },
+  { id: 'musculacao', label: 'Musculação' },
+  { id: 'profissional', label: 'Treinamento Profissional' },
+  { id: 'funcional', label: 'Funcional' },
+  { id: 'yoga', label: 'Yoga' },
+];
+
 const Professores = () => {
   const [professores, setProfessores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,14 +31,6 @@ const Professores = () => {
     telefone: '',
     especialidades: []
   });
-
-  const especialidadesOptions = React.useMemo(() => [
-    { id: 'crossfit', label: 'CrossFit' },
-    { id: 'musculacao', label: 'Musculação' },
-    { id: 'profissional', label: 'Treinamento Profissional' },
-    { id: 'funcional', label: 'Funcional' },
-    { id: 'yoga', label: 'Yoga' },
-  ], []);
 
   useEffect(() => {
     loadProfessores();
@@ -86,12 +86,11 @@ const Professores = () => {
   };
 
   const handleEspecialidadeToggle = (especialidadeId) => {
-    setFormData(prev => ({
-      ...prev,
-      especialidades: prev.especialidades.includes(especialidadeId)
-        ? prev.especialidades.filter(e => e !== especialidadeId)
-        : [...prev.especialidades, especialidadeId]
-    }));
+    const newEspecialidades = formData.especialidades.includes(especialidadeId)
+      ? formData.especialidades.filter(e => e !== especialidadeId)
+      : [...formData.especialidades, especialidadeId];
+    
+    setFormData({ ...formData, especialidades: newEspecialidades });
   };
 
   if (loading) {
@@ -155,7 +154,7 @@ const Professores = () => {
               <div>
                 <Label>Especialidades</Label>
                 <div className="grid grid-cols-2 gap-3 mt-2">
-                  {especialidadesOptions.map(especialidade => (
+                  {ESPECIALIDADES.map(especialidade => (
                     <div key={especialidade.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`esp-${especialidade.id}`}
