@@ -688,6 +688,230 @@ async def get_historico_whatsapp(current_user: User = Depends(get_current_user))
             mensagem['enviado_em'] = datetime.fromisoformat(mensagem['enviado_em'])
     return mensagens
 
+
+# ==================== AVALIACOES FISICAS ROUTES ====================
+
+def calcular_imc(peso: float, altura: float) -> float:
+    """Calcula o IMC: peso / (altura em metros)²"""
+    altura_metros = altura / 100
+    return round(peso / (altura_metros ** 2), 2)
+
+@api_router.post("/avaliacoes", response_model=AvaliacaoFisica)
+async def create_avaliacao(avaliacao: AvaliacaoFisicaCreate, current_user: User = Depends(get_current_user)):
+    # Validações
+    if avaliacao.peso < 30 or avaliacao.peso > 300:
+        raise HTTPException(status_code=400, detail="Peso deve estar entre 30kg e 300kg")
+    
+    if avaliacao.altura < 100 or avaliacao.altura > 250:
+        raise HTTPException(status_code=400, detail="Altura deve estar entre 100cm e 250cm")
+    
+    if avaliacao.percentual_gordura is not None:
+        if avaliacao.percentual_gordura < 3 or avaliacao.percentual_gordura > 60:
+            raise HTTPException(status_code=400, detail="Percentual de gordura deve estar entre 3% e 60%")
+    
+    # Buscar aluno
+    aluno = await db.alunos.find_one({"id": avaliacao.aluno_id}, {"_id": 0})
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado")
+    
+    # Buscar professor
+    professor = await db.professores.find_one({"id": avaliacao.professor_id}, {"_id": 0})
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor não encontrado")
+    
+    # Calcular IMC
+    imc = calcular_imc(avaliacao.peso, avaliacao.altura)
+    
+    # Criar objeto de avaliação
+    avaliacao_data = avaliacao.model_dump()
+    avaliacao_data['imc'] = imc
+    avaliacao_data['aluno_nome'] = aluno['nome']
+    avaliacao_data['professor_nome'] = professor['nome']
+    
+    if avaliacao_data.get('data_avaliacao') is None:
+        avaliacao_data['data_avaliacao'] = datetime.now(timezone.utc)
+    
+    avaliacao_obj = AvaliacaoFisica(**avaliacao_data)
+    
+    # Converter para documento
+    doc = avaliacao_obj.model_dump()
+    doc['data_avaliacao'] = doc['data_avaliacao'].isoformat()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    
+    await db.avaliacoes_fisicas.insert_one(doc)
+    return avaliacao_obj
+
+@api_router.get("/avaliacoes", response_model=List[AvaliacaoFisica])
+async def get_avaliacoes(aluno_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    query = {}
+    if aluno_id:
+        query['aluno_id'] = aluno_id
+    
+    avaliacoes = await db.avaliacoes_fisicas.find(query, {"_id": 0}).sort("data_avaliacao", -1).to_list(1000)
+    
+    for avaliacao in avaliacoes:
+        if isinstance(avaliacao['data_avaliacao'], str):
+            avaliacao['data_avaliacao'] = datetime.fromisoformat(avaliacao['data_avaliacao'])
+        if isinstance(avaliacao['criado_em'], str):
+            avaliacao['criado_em'] = datetime.fromisoformat(avaliacao['criado_em'])
+    
+    return avaliacoes
+
+@api_router.get("/avaliacoes/{avaliacao_id}", response_model=AvaliacaoFisica)
+async def get_avaliacao(avaliacao_id: str, current_user: User = Depends(get_current_user)):
+    avaliacao = await db.avaliacoes_fisicas.find_one({"id": avaliacao_id}, {"_id": 0})
+    if not avaliacao:
+        raise HTTPException(status_code=404, detail="Avaliação não encontrada")
+    
+    if isinstance(avaliacao['data_avaliacao'], str):
+        avaliacao['data_avaliacao'] = datetime.fromisoformat(avaliacao['data_avaliacao'])
+    if isinstance(avaliacao['criado_em'], str):
+        avaliacao['criado_em'] = datetime.fromisoformat(avaliacao['criado_em'])
+    
+    return AvaliacaoFisica(**avaliacao)
+
+@api_router.put("/avaliacoes/{avaliacao_id}", response_model=AvaliacaoFisica)
+async def update_avaliacao(avaliacao_id: str, avaliacao_update: AvaliacaoFisicaUpdate, current_user: User = Depends(get_current_user)):
+    update_data = {k: v for k, v in avaliacao_update.model_dump().items() if v is not None}
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Nenhum dado para atualizar")
+    
+    # Validações
+    if 'peso' in update_data:
+        if update_data['peso'] < 30 or update_data['peso'] > 300:
+            raise HTTPException(status_code=400, detail="Peso deve estar entre 30kg e 300kg")
+    
+    if 'altura' in update_data:
+        if update_data['altura'] < 100 or update_data['altura'] > 250:
+            raise HTTPException(status_code=400, detail="Altura deve estar entre 100cm e 250cm")
+    
+    if 'percentual_gordura' in update_data and update_data['percentual_gordura'] is not None:
+        if update_data['percentual_gordura'] < 3 or update_data['percentual_gordura'] > 60:
+            raise HTTPException(status_code=400, detail="Percentual de gordura deve estar entre 3% e 60%")
+    
+    # Recalcular IMC se peso ou altura mudaram
+    avaliacao_atual = await db.avaliacoes_fisicas.find_one({"id": avaliacao_id}, {"_id": 0})
+    if not avaliacao_atual:
+        raise HTTPException(status_code=404, detail="Avaliação não encontrada")
+    
+    peso = update_data.get('peso', avaliacao_atual.get('peso'))
+    altura = update_data.get('altura', avaliacao_atual.get('altura'))
+    
+    if peso and altura:
+        update_data['imc'] = calcular_imc(peso, altura)
+    
+    result = await db.avaliacoes_fisicas.update_one({"id": avaliacao_id}, {"$set": update_data})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Avaliação não encontrada")
+    
+    avaliacao = await db.avaliacoes_fisicas.find_one({"id": avaliacao_id}, {"_id": 0})
+    if isinstance(avaliacao['data_avaliacao'], str):
+        avaliacao['data_avaliacao'] = datetime.fromisoformat(avaliacao['data_avaliacao'])
+    if isinstance(avaliacao['criado_em'], str):
+        avaliacao['criado_em'] = datetime.fromisoformat(avaliacao['criado_em'])
+    
+    return AvaliacaoFisica(**avaliacao)
+
+@api_router.delete("/avaliacoes/{avaliacao_id}")
+async def delete_avaliacao(avaliacao_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.avaliacoes_fisicas.delete_one({"id": avaliacao_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Avaliação não encontrada")
+    return {"message": "Avaliação deletada com sucesso"}
+
+@api_router.get("/avaliacoes/aluno/{aluno_id}/historico", response_model=List[AvaliacaoFisica])
+async def get_historico_aluno(aluno_id: str, current_user: User = Depends(get_current_user)):
+    avaliacoes = await db.avaliacoes_fisicas.find(
+        {"aluno_id": aluno_id}, 
+        {"_id": 0}
+    ).sort("data_avaliacao", -1).to_list(1000)
+    
+    for avaliacao in avaliacoes:
+        if isinstance(avaliacao['data_avaliacao'], str):
+            avaliacao['data_avaliacao'] = datetime.fromisoformat(avaliacao['data_avaliacao'])
+        if isinstance(avaliacao['criado_em'], str):
+            avaliacao['criado_em'] = datetime.fromisoformat(avaliacao['criado_em'])
+    
+    return avaliacoes
+
+@api_router.get("/avaliacoes/aluno/{aluno_id}/comparacao", response_model=ComparacaoAvaliacoes)
+async def get_comparacao_avaliacoes(aluno_id: str, current_user: User = Depends(get_current_user)):
+    # Buscar primeira e última avaliação
+    primeira = await db.avaliacoes_fisicas.find_one(
+        {"aluno_id": aluno_id}, 
+        {"_id": 0}
+    ).sort("data_avaliacao", 1).limit(1).to_list(1)
+    
+    ultima = await db.avaliacoes_fisicas.find_one(
+        {"aluno_id": aluno_id}, 
+        {"_id": 0}
+    ).sort("data_avaliacao", -1).limit(1).to_list(1)
+    
+    if not primeira or not ultima:
+        return ComparacaoAvaliacoes(primeira=None, ultima=None, diferencas={})
+    
+    primeira = primeira[0] if primeira else None
+    ultima = ultima[0] if ultima else None
+    
+    if primeira:
+        if isinstance(primeira['data_avaliacao'], str):
+            primeira['data_avaliacao'] = datetime.fromisoformat(primeira['data_avaliacao'])
+        if isinstance(primeira['criado_em'], str):
+            primeira['criado_em'] = datetime.fromisoformat(primeira['criado_em'])
+    
+    if ultima:
+        if isinstance(ultima['data_avaliacao'], str):
+            ultima['data_avaliacao'] = datetime.fromisoformat(ultima['data_avaliacao'])
+        if isinstance(ultima['criado_em'], str):
+            ultima['criado_em'] = datetime.fromisoformat(ultima['criado_em'])
+    
+    # Calcular diferenças
+    diferencas = {}
+    if primeira and ultima and primeira != ultima:
+        diferencas['peso'] = round(ultima['peso'] - primeira['peso'], 2)
+        diferencas['imc'] = round(ultima['imc'] - primeira['imc'], 2)
+        
+        if primeira.get('percentual_gordura') and ultima.get('percentual_gordura'):
+            diferencas['percentual_gordura'] = round(
+                ultima['percentual_gordura'] - primeira['percentual_gordura'], 2
+            )
+        
+        if primeira.get('massa_magra') and ultima.get('massa_magra'):
+            diferencas['massa_magra'] = round(ultima['massa_magra'] - primeira['massa_magra'], 2)
+    
+    primeira_obj = AvaliacaoFisica(**primeira) if primeira else None
+    ultima_obj = AvaliacaoFisica(**ultima) if ultima else None
+    
+    return ComparacaoAvaliacoes(
+        primeira=primeira_obj,
+        ultima=ultima_obj,
+        diferencas=diferencas
+    )
+
+@api_router.post("/avaliacoes/{avaliacao_id}/upload-foto")
+async def upload_foto(avaliacao_id: str, foto: FotoUpload, current_user: User = Depends(get_current_user)):
+    avaliacao = await db.avaliacoes_fisicas.find_one({"id": avaliacao_id}, {"_id": 0})
+    if not avaliacao:
+        raise HTTPException(status_code=404, detail="Avaliação não encontrada")
+    
+    # Adicionar foto ao array
+    fotos = avaliacao.get('fotos', [])
+    
+    if len(fotos) >= 6:
+        raise HTTPException(status_code=400, detail="Máximo de 6 fotos permitidas")
+    
+    fotos.append(foto.foto_base64)
+    
+    await db.avaliacoes_fisicas.update_one(
+        {"id": avaliacao_id},
+        {"$set": {"fotos": fotos}}
+    )
+    
+    return {"message": "Foto adicionada com sucesso", "total_fotos": len(fotos)}
+
+
 # ==================== DASHBOARD ROUTES ====================
 
 @api_router.get("/dashboard/stats", response_model=DashboardStats)
