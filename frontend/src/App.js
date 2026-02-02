@@ -57,6 +57,8 @@ function App() {
             <Route path="checkins" element={<CheckIns />} />
             <Route path="equipamentos" element={<Equipamentos />} />
             <Route path="whatsapp" element={<WhatsApp />} />
+            <Route path="avaliacoes" element={<AvaliacoesFisicas />} />
+            <Route path="avaliacoes/nova" element={<NovaAvaliacao />} />
           </Route>
         </Routes>
       </BrowserRouter>
