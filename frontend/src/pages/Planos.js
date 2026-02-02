@@ -10,14 +10,6 @@ import { Plus, Edit, Trash2, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 
-const MODALIDADES = [
-  { id: 'crossfit', label: 'CrossFit' },
-  { id: 'musculacao', label: 'Musculação' },
-  { id: 'profissional', label: 'Treinamento Profissional' },
-  { id: 'funcional', label: 'Funcional' },
-  { id: 'yoga', label: 'Yoga' },
-];
-
 const Planos = () => {
   const [planos, setPlanos] = useState([]);
   const [loading, setLoading] = useState(true);
