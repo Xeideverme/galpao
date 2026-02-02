@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   GraduationCap,
-  CheckCircle
+  CheckCircle,
+  Activity
 } from 'lucide-react';
 
 const Layout = () => {
@@ -25,6 +26,7 @@ const Layout = () => {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
     { icon: Users, label: 'Alunos', path: '/alunos' },
+    { icon: Activity, label: 'Avaliações Físicas', path: '/avaliacoes' },
     { icon: CreditCard, label: 'Planos', path: '/planos' },
     { icon: DollarSign, label: 'Financeiro', path: '/financeiro' },
     { icon: GraduationCap, label: 'Professores', path: '/professores' },
