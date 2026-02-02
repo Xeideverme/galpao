@@ -248,6 +248,60 @@ class MensagemWhatsAppCreate(BaseModel):
     destinatarios: List[str]
     mensagem: str
 
+# Avaliacao Fisica Models
+class AvaliacaoFisica(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    aluno_id: str
+    aluno_nome: str
+    professor_id: str
+    professor_nome: str
+    data_avaliacao: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    peso: float  # kg
+    altura: float  # cm
+    imc: float  # calculado automaticamente
+    percentual_gordura: Optional[float] = None
+    massa_magra: Optional[float] = None
+    circunferencias: dict = Field(default_factory=dict)
+    dobras_cutaneas: Optional[dict] = None
+    fotos: List[str] = Field(default_factory=list)
+    observacoes: Optional[str] = None
+    objetivos: Optional[str] = None
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AvaliacaoFisicaCreate(BaseModel):
+    aluno_id: str
+    professor_id: str
+    data_avaliacao: Optional[datetime] = None
+    peso: float
+    altura: float
+    percentual_gordura: Optional[float] = None
+    massa_magra: Optional[float] = None
+    circunferencias: Optional[dict] = None
+    dobras_cutaneas: Optional[dict] = None
+    fotos: Optional[List[str]] = None
+    observacoes: Optional[str] = None
+    objetivos: Optional[str] = None
+
+class AvaliacaoFisicaUpdate(BaseModel):
+    peso: Optional[float] = None
+    altura: Optional[float] = None
+    percentual_gordura: Optional[float] = None
+    massa_magra: Optional[float] = None
+    circunferencias: Optional[dict] = None
+    dobras_cutaneas: Optional[dict] = None
+    fotos: Optional[List[str]] = None
+    observacoes: Optional[str] = None
+    objetivos: Optional[str] = None
+
+class FotoUpload(BaseModel):
+    foto_base64: str
+
+class ComparacaoAvaliacoes(BaseModel):
+    primeira: Optional[AvaliacaoFisica] = None
+    ultima: Optional[AvaliacaoFisica] = None
+    diferencas: dict = Field(default_factory=dict)
+
 # Dashboard Models
 class DashboardStats(BaseModel):
     total_alunos: int
