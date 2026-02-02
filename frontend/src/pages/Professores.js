@@ -24,13 +24,13 @@ const Professores = () => {
     especialidades: []
   });
 
-  const especialidadesOptions = [
+  const especialidadesOptions = React.useMemo(() => [
     { id: 'crossfit', label: 'CrossFit' },
     { id: 'musculacao', label: 'Musculação' },
     { id: 'profissional', label: 'Treinamento Profissional' },
     { id: 'funcional', label: 'Funcional' },
     { id: 'yoga', label: 'Yoga' },
-  ];
+  ], []);
 
   useEffect(() => {
     loadProfessores();
