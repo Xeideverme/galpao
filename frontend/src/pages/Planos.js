@@ -167,19 +167,51 @@ const Planos = () => {
                 <div className="col-span-2">
                   <Label>Modalidades Incluídas</Label>
                   <div className="grid grid-cols-2 gap-3 mt-2">
-                    {MODALIDADES.map(modalidade => (
-                      <div key={modalidade.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={modalidade.id}
-                          data-testid={`modalidade-${modalidade.id}`}
-                          checked={formData.modalidades.includes(modalidade.id)}
-                          onCheckedChange={() => handleModalidadeToggle(modalidade.id)}
-                        />
-                        <label htmlFor={modalidade.id} className="text-sm cursor-pointer">
-                          {modalidade.label}
-                        </label>
-                      </div>
-                    ))}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="crossfit"
+                        data-testid="modalidade-crossfit"
+                        checked={formData.modalidades.includes('crossfit')}
+                        onCheckedChange={() => handleModalidadeToggle('crossfit')}
+                      />
+                      <label htmlFor="crossfit" className="text-sm cursor-pointer">CrossFit</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="musculacao"
+                        data-testid="modalidade-musculacao"
+                        checked={formData.modalidades.includes('musculacao')}
+                        onCheckedChange={() => handleModalidadeToggle('musculacao')}
+                      />
+                      <label htmlFor="musculacao" className="text-sm cursor-pointer">Musculação</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="profissional"
+                        data-testid="modalidade-profissional"
+                        checked={formData.modalidades.includes('profissional')}
+                        onCheckedChange={() => handleModalidadeToggle('profissional')}
+                      />
+                      <label htmlFor="profissional" className="text-sm cursor-pointer">Treinamento Profissional</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="funcional"
+                        data-testid="modalidade-funcional"
+                        checked={formData.modalidades.includes('funcional')}
+                        onCheckedChange={() => handleModalidadeToggle('funcional')}
+                      />
+                      <label htmlFor="funcional" className="text-sm cursor-pointer">Funcional</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="yoga"
+                        data-testid="modalidade-yoga"
+                        checked={formData.modalidades.includes('yoga')}
+                        onCheckedChange={() => handleModalidadeToggle('yoga')}
+                      />
+                      <label htmlFor="yoga" className="text-sm cursor-pointer">Yoga</label>
+                    </div>
                   </div>
                 </div>
               </div>
