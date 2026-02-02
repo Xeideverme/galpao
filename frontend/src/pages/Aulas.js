@@ -27,7 +27,7 @@ const Aulas = () => {
     capacidade_maxima: 15
   });
 
-  const diasSemana = [
+  const diasSemana = React.useMemo(() => [
     { value: 'segunda', label: 'Segunda-feira' },
     { value: 'terca', label: 'Terça-feira' },
     { value: 'quarta', label: 'Quarta-feira' },
@@ -35,15 +35,15 @@ const Aulas = () => {
     { value: 'sexta', label: 'Sexta-feira' },
     { value: 'sabado', label: 'Sábado' },
     { value: 'domingo', label: 'Domingo' },
-  ];
+  ], []);
 
-  const modalidades = [
+  const modalidades = React.useMemo(() => [
     { value: 'crossfit', label: 'CrossFit' },
     { value: 'musculacao', label: 'Musculação' },
     { value: 'profissional', label: 'Treinamento Profissional' },
     { value: 'funcional', label: 'Funcional' },
     { value: 'yoga', label: 'Yoga' },
-  ];
+  ], []);
 
   useEffect(() => {
     loadData();
