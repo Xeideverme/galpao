@@ -12,6 +12,8 @@ import Aulas from './pages/Aulas';
 import CheckIns from './pages/CheckIns';
 import Equipamentos from './pages/Equipamentos';
 import WhatsApp from './pages/WhatsApp';
+import AvaliacoesFisicas from './pages/AvaliacoesFisicas';
+import NovaAvaliacao from './pages/NovaAvaliacao';
 import '@/App.css';
 
 const PrivateRoute = ({ children }) => {
