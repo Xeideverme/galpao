@@ -14,6 +14,13 @@ import Equipamentos from './pages/Equipamentos';
 import WhatsApp from './pages/WhatsApp';
 import AvaliacoesFisicas from './pages/AvaliacoesFisicas';
 import NovaAvaliacao from './pages/NovaAvaliacao';
+import Exercicios from './pages/Exercicios';
+import FichasTreino from './pages/FichasTreino';
+import NovaFichaTreino from './pages/NovaFichaTreino';
+import DetalhesFicha from './pages/DetalhesFicha';
+import RegistrarTreino from './pages/RegistrarTreino';
+import HistoricoTreino from './pages/HistoricoTreino';
+import ProgressaoCarga from './pages/ProgressaoCarga';
 import '@/App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -59,6 +66,13 @@ function App() {
             <Route path="whatsapp" element={<WhatsApp />} />
             <Route path="avaliacoes" element={<AvaliacoesFisicas />} />
             <Route path="avaliacoes/nova" element={<NovaAvaliacao />} />
+            <Route path="exercicios" element={<Exercicios />} />
+            <Route path="fichas" element={<FichasTreino />} />
+            <Route path="fichas/nova" element={<NovaFichaTreino />} />
+            <Route path="fichas/:id" element={<DetalhesFicha />} />
+            <Route path="treinos/registrar" element={<RegistrarTreino />} />
+            <Route path="treinos/historico/:alunoId" element={<HistoricoTreino />} />
+            <Route path="treinos/progressao/:alunoId" element={<ProgressaoCarga />} />
           </Route>
         </Routes>
       </BrowserRouter>

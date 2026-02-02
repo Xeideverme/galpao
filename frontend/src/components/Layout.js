@@ -15,7 +15,9 @@ import {
   X,
   GraduationCap,
   CheckCircle,
-  Activity
+  Activity,
+  ClipboardList,
+  BarChart3
 } from 'lucide-react';
 
 const Layout = () => {
@@ -27,12 +29,14 @@ const Layout = () => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
     { icon: Users, label: 'Alunos', path: '/alunos' },
     { icon: Activity, label: 'Avaliações Físicas', path: '/avaliacoes' },
+    { icon: Dumbbell, label: 'Exercícios', path: '/exercicios' },
+    { icon: ClipboardList, label: 'Fichas de Treino', path: '/fichas' },
     { icon: CreditCard, label: 'Planos', path: '/planos' },
     { icon: DollarSign, label: 'Financeiro', path: '/financeiro' },
     { icon: GraduationCap, label: 'Professores', path: '/professores' },
     { icon: Calendar, label: 'Aulas', path: '/aulas' },
     { icon: CheckCircle, label: 'Check-ins', path: '/checkins' },
-    { icon: Dumbbell, label: 'Equipamentos', path: '/equipamentos' },
+    { icon: Package, label: 'Equipamentos', path: '/equipamentos' },
     { icon: MessageSquare, label: 'WhatsApp', path: '/whatsapp' },
   ];
 
