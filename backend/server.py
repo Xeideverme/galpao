@@ -1045,7 +1045,415 @@ async def upload_foto(avaliacao_id: str, foto: FotoUpload, current_user: User = 
     return {"message": "Foto adicionada com sucesso", "total_fotos": len(fotos)}
 
 
-# ==================== DASHBOARD ROUTES ====================
+# ==================== EXERCICIOS ROUTES ====================
+
+@api_router.post("/exercicios", response_model=Exercicio)
+async def create_exercicio(exercicio: ExercicioCreate, current_user: User = Depends(get_current_user)):
+    # Verificar nome único
+    existing = await db.exercicios.find_one({"nome": exercicio.nome}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Já existe um exercício com este nome")
+    
+    exercicio_obj = Exercicio(**exercicio.model_dump())
+    doc = exercicio_obj.model_dump()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    
+    await db.exercicios.insert_one(doc)
+    return exercicio_obj
+
+@api_router.get("/exercicios", response_model=List[Exercicio])
+async def get_exercicios(
+    grupo_muscular: Optional[str] = None,
+    equipamento: Optional[str] = None,
+    dificuldade: Optional[str] = None,
+    ativo: Optional[bool] = True,
+    current_user: User = Depends(get_current_user)
+):
+    query = {}
+    if grupo_muscular:
+        query['grupo_muscular'] = grupo_muscular
+    if equipamento:
+        query['equipamento'] = equipamento
+    if dificuldade:
+        query['dificuldade'] = dificuldade
+    if ativo is not None:
+        query['ativo'] = ativo
+    
+    exercicios = await db.exercicios.find(query, {"_id": 0}).sort("nome", 1).to_list(1000)
+    for exercicio in exercicios:
+        if isinstance(exercicio['criado_em'], str):
+            exercicio['criado_em'] = datetime.fromisoformat(exercicio['criado_em'])
+    return exercicios
+
+@api_router.get("/exercicios/{exercicio_id}", response_model=Exercicio)
+async def get_exercicio(exercicio_id: str, current_user: User = Depends(get_current_user)):
+    exercicio = await db.exercicios.find_one({"id": exercicio_id}, {"_id": 0})
+    if not exercicio:
+        raise HTTPException(status_code=404, detail="Exercício não encontrado")
+    
+    if isinstance(exercicio['criado_em'], str):
+        exercicio['criado_em'] = datetime.fromisoformat(exercicio['criado_em'])
+    return Exercicio(**exercicio)
+
+@api_router.put("/exercicios/{exercicio_id}", response_model=Exercicio)
+async def update_exercicio(exercicio_id: str, exercicio_update: ExercicioUpdate, current_user: User = Depends(get_current_user)):
+    update_data = {k: v for k, v in exercicio_update.model_dump().items() if v is not None}
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Nenhum dado para atualizar")
+    
+    # Verificar nome único se estiver sendo alterado
+    if 'nome' in update_data:
+        existing = await db.exercicios.find_one({"nome": update_data['nome'], "id": {"$ne": exercicio_id}}, {"_id": 0})
+        if existing:
+            raise HTTPException(status_code=400, detail="Já existe um exercício com este nome")
+    
+    result = await db.exercicios.update_one({"id": exercicio_id}, {"$set": update_data})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Exercício não encontrado")
+    
+    exercicio = await db.exercicios.find_one({"id": exercicio_id}, {"_id": 0})
+    if isinstance(exercicio['criado_em'], str):
+        exercicio['criado_em'] = datetime.fromisoformat(exercicio['criado_em'])
+    return Exercicio(**exercicio)
+
+@api_router.delete("/exercicios/{exercicio_id}")
+async def delete_exercicio(exercicio_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.exercicios.delete_one({"id": exercicio_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Exercício não encontrado")
+    return {"message": "Exercício deletado com sucesso"}
+
+
+# ==================== FICHAS DE TREINO ROUTES ====================
+
+@api_router.post("/fichas", response_model=FichaTreino)
+async def create_ficha(ficha: FichaTreinoCreate, current_user: User = Depends(get_current_user)):
+    # Validar aluno
+    aluno = await db.alunos.find_one({"id": ficha.aluno_id}, {"_id": 0})
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado")
+    
+    # Validar professor
+    professor = await db.professores.find_one({"id": ficha.professor_id}, {"_id": 0})
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor não encontrado")
+    
+    # Validar exercícios
+    if len(ficha.exercicios) == 0:
+        raise HTTPException(status_code=400, detail="A ficha deve ter pelo menos 1 exercício")
+    
+    for ex in ficha.exercicios:
+        if ex.series < 1 or ex.series > 10:
+            raise HTTPException(status_code=400, detail="O número de séries deve estar entre 1 e 10")
+        
+        exercicio_exists = await db.exercicios.find_one({"id": ex.exercicio_id}, {"_id": 0})
+        if not exercicio_exists:
+            raise HTTPException(status_code=404, detail=f"Exercício {ex.exercicio_id} não encontrado")
+    
+    # Validar datas
+    if ficha.data_fim and ficha.data_fim < ficha.data_inicio:
+        raise HTTPException(status_code=400, detail="Data de fim deve ser posterior à data de início")
+    
+    ficha_data = ficha.model_dump()
+    ficha_data['aluno_nome'] = aluno['nome']
+    ficha_data['professor_nome'] = professor['nome']
+    
+    ficha_obj = FichaTreino(**ficha_data)
+    doc = ficha_obj.model_dump()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    
+    await db.fichas_treino.insert_one(doc)
+    return ficha_obj
+
+@api_router.get("/fichas", response_model=List[FichaTreino])
+async def get_fichas(
+    aluno_id: Optional[str] = None,
+    professor_id: Optional[str] = None,
+    ativo: Optional[bool] = None,
+    current_user: User = Depends(get_current_user)
+):
+    query = {}
+    if aluno_id:
+        query['aluno_id'] = aluno_id
+    if professor_id:
+        query['professor_id'] = professor_id
+    if ativo is not None:
+        query['ativo'] = ativo
+    
+    fichas = await db.fichas_treino.find(query, {"_id": 0}).sort("criado_em", -1).to_list(1000)
+    for ficha in fichas:
+        if isinstance(ficha['criado_em'], str):
+            ficha['criado_em'] = datetime.fromisoformat(ficha['criado_em'])
+    return fichas
+
+@api_router.get("/fichas/{ficha_id}", response_model=FichaTreino)
+async def get_ficha(ficha_id: str, current_user: User = Depends(get_current_user)):
+    ficha = await db.fichas_treino.find_one({"id": ficha_id}, {"_id": 0})
+    if not ficha:
+        raise HTTPException(status_code=404, detail="Ficha não encontrada")
+    
+    if isinstance(ficha['criado_em'], str):
+        ficha['criado_em'] = datetime.fromisoformat(ficha['criado_em'])
+    return FichaTreino(**ficha)
+
+@api_router.put("/fichas/{ficha_id}", response_model=FichaTreino)
+async def update_ficha(ficha_id: str, ficha_update: FichaTreinoUpdate, current_user: User = Depends(get_current_user)):
+    update_data = {k: v for k, v in ficha_update.model_dump().items() if v is not None}
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Nenhum dado para atualizar")
+    
+    # Validar exercícios se estiverem sendo atualizados
+    if 'exercicios' in update_data:
+        exercicios = update_data['exercicios']
+        if len(exercicios) == 0:
+            raise HTTPException(status_code=400, detail="A ficha deve ter pelo menos 1 exercício")
+        
+        for ex in exercicios:
+            if ex.series < 1 or ex.series > 10:
+                raise HTTPException(status_code=400, detail="O número de séries deve estar entre 1 e 10")
+        
+        # Converter ExercicioFicha para dict
+        update_data['exercicios'] = [ex.model_dump() if hasattr(ex, 'model_dump') else ex for ex in exercicios]
+    
+    result = await db.fichas_treino.update_one({"id": ficha_id}, {"$set": update_data})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Ficha não encontrada")
+    
+    ficha = await db.fichas_treino.find_one({"id": ficha_id}, {"_id": 0})
+    if isinstance(ficha['criado_em'], str):
+        ficha['criado_em'] = datetime.fromisoformat(ficha['criado_em'])
+    return FichaTreino(**ficha)
+
+@api_router.delete("/fichas/{ficha_id}")
+async def delete_ficha(ficha_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.fichas_treino.delete_one({"id": ficha_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Ficha não encontrada")
+    return {"message": "Ficha deletada com sucesso"}
+
+@api_router.get("/fichas/aluno/{aluno_id}/ativas", response_model=List[FichaTreino])
+async def get_fichas_ativas_aluno(aluno_id: str, current_user: User = Depends(get_current_user)):
+    hoje = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    fichas = await db.fichas_treino.find({
+        "aluno_id": aluno_id,
+        "ativo": True,
+        "$or": [
+            {"data_fim": None},
+            {"data_fim": {"$gte": hoje}}
+        ]
+    }, {"_id": 0}).to_list(100)
+    
+    for ficha in fichas:
+        if isinstance(ficha['criado_em'], str):
+            ficha['criado_em'] = datetime.fromisoformat(ficha['criado_em'])
+    
+    return fichas
+
+@api_router.post("/fichas/{ficha_id}/duplicar", response_model=FichaTreino)
+async def duplicar_ficha(ficha_id: str, aluno_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    ficha_original = await db.fichas_treino.find_one({"id": ficha_id}, {"_id": 0})
+    if not ficha_original:
+        raise HTTPException(status_code=404, detail="Ficha não encontrada")
+    
+    # Se um novo aluno for especificado, buscar seus dados
+    if aluno_id:
+        aluno = await db.alunos.find_one({"id": aluno_id}, {"_id": 0})
+        if not aluno:
+            raise HTTPException(status_code=404, detail="Aluno não encontrado")
+        ficha_original['aluno_id'] = aluno_id
+        ficha_original['aluno_nome'] = aluno['nome']
+    
+    # Criar nova ficha com novo ID
+    ficha_original['id'] = str(uuid.uuid4())
+    ficha_original['nome'] = f"{ficha_original['nome']} (Cópia)"
+    ficha_original['data_inicio'] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ficha_original['data_fim'] = None
+    ficha_original['ativo'] = True
+    ficha_original['criado_em'] = datetime.now(timezone.utc)
+    
+    doc = ficha_original.copy()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    
+    await db.fichas_treino.insert_one(doc)
+    
+    return FichaTreino(**ficha_original)
+
+@api_router.post("/fichas/{ficha_id}/arquivar")
+async def arquivar_ficha(ficha_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.fichas_treino.update_one(
+        {"id": ficha_id},
+        {"$set": {"ativo": False}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Ficha não encontrada")
+    
+    return {"message": "Ficha arquivada com sucesso"}
+
+
+# ==================== REGISTROS DE TREINO ROUTES ====================
+
+@api_router.post("/registros-treino", response_model=RegistroTreino)
+async def create_registro_treino(registro: RegistroTreinoCreate, current_user: User = Depends(get_current_user)):
+    # Validar aluno
+    aluno = await db.alunos.find_one({"id": registro.aluno_id}, {"_id": 0})
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado")
+    
+    # Validar ficha
+    ficha = await db.fichas_treino.find_one({"id": registro.ficha_id}, {"_id": 0})
+    if not ficha:
+        raise HTTPException(status_code=404, detail="Ficha não encontrada")
+    
+    # Validar data não futura
+    data_treino = registro.data_treino or datetime.now(timezone.utc)
+    if data_treino > datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Data do treino não pode ser no futuro")
+    
+    # Validar cargas positivas
+    for ex_realizado in registro.exercicios_realizados:
+        for serie in ex_realizado.series_realizadas:
+            if serie.carga < 0:
+                raise HTTPException(status_code=400, detail="Carga deve ser um valor positivo")
+    
+    registro_data = registro.model_dump()
+    registro_data['aluno_nome'] = aluno['nome']
+    registro_data['ficha_nome'] = ficha['nome']
+    registro_data['data_treino'] = data_treino
+    
+    # Adicionar nome dos exercícios
+    for ex_realizado in registro_data['exercicios_realizados']:
+        exercicio = await db.exercicios.find_one({"id": ex_realizado['exercicio_id']}, {"_id": 0})
+        if exercicio:
+            ex_realizado['exercicio_nome'] = exercicio['nome']
+    
+    registro_obj = RegistroTreino(**registro_data)
+    doc = registro_obj.model_dump()
+    doc['data_treino'] = doc['data_treino'].isoformat()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    
+    await db.registros_treino.insert_one(doc)
+    return registro_obj
+
+@api_router.get("/registros-treino", response_model=List[RegistroTreino])
+async def get_registros_treino(
+    aluno_id: Optional[str] = None,
+    ficha_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    query = {}
+    if aluno_id:
+        query['aluno_id'] = aluno_id
+    if ficha_id:
+        query['ficha_id'] = ficha_id
+    
+    registros = await db.registros_treino.find(query, {"_id": 0}).sort("data_treino", -1).to_list(1000)
+    for registro in registros:
+        if isinstance(registro['data_treino'], str):
+            registro['data_treino'] = datetime.fromisoformat(registro['data_treino'])
+        if isinstance(registro['criado_em'], str):
+            registro['criado_em'] = datetime.fromisoformat(registro['criado_em'])
+    return registros
+
+@api_router.get("/registros-treino/{registro_id}", response_model=RegistroTreino)
+async def get_registro_treino(registro_id: str, current_user: User = Depends(get_current_user)):
+    registro = await db.registros_treino.find_one({"id": registro_id}, {"_id": 0})
+    if not registro:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    
+    if isinstance(registro['data_treino'], str):
+        registro['data_treino'] = datetime.fromisoformat(registro['data_treino'])
+    if isinstance(registro['criado_em'], str):
+        registro['criado_em'] = datetime.fromisoformat(registro['criado_em'])
+    return RegistroTreino(**registro)
+
+@api_router.delete("/registros-treino/{registro_id}")
+async def delete_registro_treino(registro_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.registros_treino.delete_one({"id": registro_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    return {"message": "Registro deletado com sucesso"}
+
+@api_router.get("/registros-treino/aluno/{aluno_id}/historico", response_model=List[RegistroTreino])
+async def get_historico_treinos_aluno(aluno_id: str, current_user: User = Depends(get_current_user)):
+    registros = await db.registros_treino.find(
+        {"aluno_id": aluno_id},
+        {"_id": 0}
+    ).sort("data_treino", -1).to_list(1000)
+    
+    for registro in registros:
+        if isinstance(registro['data_treino'], str):
+            registro['data_treino'] = datetime.fromisoformat(registro['data_treino'])
+        if isinstance(registro['criado_em'], str):
+            registro['criado_em'] = datetime.fromisoformat(registro['criado_em'])
+    
+    return registros
+
+@api_router.get("/registros-treino/aluno/{aluno_id}/progressao/{exercicio_id}", response_model=ProgressaoCarga)
+async def get_progressao_carga(aluno_id: str, exercicio_id: str, current_user: User = Depends(get_current_user)):
+    # Buscar exercício
+    exercicio = await db.exercicios.find_one({"id": exercicio_id}, {"_id": 0})
+    if not exercicio:
+        raise HTTPException(status_code=404, detail="Exercício não encontrado")
+    
+    # Buscar todos os registros do aluno
+    registros = await db.registros_treino.find(
+        {"aluno_id": aluno_id},
+        {"_id": 0}
+    ).sort("data_treino", 1).to_list(10000)
+    
+    historico = []
+    for registro in registros:
+        data_treino = registro['data_treino']
+        if isinstance(data_treino, str):
+            data_treino = datetime.fromisoformat(data_treino)
+        
+        for ex_realizado in registro.get('exercicios_realizados', []):
+            if ex_realizado.get('exercicio_id') == exercicio_id:
+                series = ex_realizado.get('series_realizadas', [])
+                if series:
+                    cargas = [s['carga'] for s in series if s.get('carga', 0) > 0]
+                    if cargas:
+                        historico.append({
+                            "data": data_treino.strftime("%Y-%m-%d"),
+                            "carga_media": round(sum(cargas) / len(cargas), 2),
+                            "carga_maxima": max(cargas),
+                            "total_series": len(series),
+                            "total_reps": sum(s.get('repeticoes', 0) for s in series)
+                        })
+    
+    return ProgressaoCarga(
+        exercicio_id=exercicio_id,
+        exercicio_nome=exercicio['nome'],
+        historico=historico
+    )
+
+@api_router.get("/registros-treino/aluno/{aluno_id}/calendario")
+async def get_calendario_treinos(aluno_id: str, current_user: User = Depends(get_current_user)):
+    registros = await db.registros_treino.find(
+        {"aluno_id": aluno_id},
+        {"_id": 0, "id": 1, "data_treino": 1, "divisao": 1, "duracao_minutos": 1}
+    ).to_list(10000)
+    
+    calendario = []
+    for registro in registros:
+        data_treino = registro['data_treino']
+        if isinstance(data_treino, str):
+            data_treino = datetime.fromisoformat(data_treino)
+        
+        calendario.append({
+            "id": registro['id'],
+            "data": data_treino.strftime("%Y-%m-%d"),
+            "divisao": registro.get('divisao', ''),
+            "duracao": registro.get('duracao_minutos')
+        })
+    
+    return calendario
 
 @api_router.get("/dashboard/stats", response_model=DashboardStats)
 async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
