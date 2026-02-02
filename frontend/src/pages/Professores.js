@@ -10,14 +10,6 @@ import { Plus, GraduationCap, Mail, Phone, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 
-const ESPECIALIDADES = [
-  { id: 'crossfit', label: 'CrossFit' },
-  { id: 'musculacao', label: 'Musculação' },
-  { id: 'profissional', label: 'Treinamento Profissional' },
-  { id: 'funcional', label: 'Funcional' },
-  { id: 'yoga', label: 'Yoga' },
-];
-
 const Professores = () => {
   const [professores, setProfessores] = useState([]);
   const [loading, setLoading] = useState(true);
