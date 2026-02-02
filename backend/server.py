@@ -1488,6 +1488,10 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
     avaliacoes = await db.avaliacoes_fisicas.find({}, {"_id": 0}).to_list(10000)
     avaliacoes_mes = sum(1 for a in avaliacoes if a.get('data_avaliacao', '').startswith(mes_atual))
     
+    # Treinos registrados hoje
+    registros_treino = await db.registros_treino.find({}, {"_id": 0}).to_list(10000)
+    treinos_hoje = sum(1 for r in registros_treino if r.get('data_treino', '').startswith(hoje))
+    
     return DashboardStats(
         total_alunos=total_alunos,
         alunos_ativos=alunos_ativos,
@@ -1497,7 +1501,8 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         checkins_hoje=checkins_hoje,
         pagamentos_pendentes=pagamentos_pendentes,
         taxa_ocupacao=round(taxa_ocupacao, 2),
-        avaliacoes_mes=avaliacoes_mes
+        avaliacoes_mes=avaliacoes_mes,
+        treinos_hoje=treinos_hoje
     )
 
 # ==================== ROOT ROUTES ====================
