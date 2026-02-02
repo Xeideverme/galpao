@@ -313,6 +313,138 @@ class DashboardStats(BaseModel):
     pagamentos_pendentes: int
     taxa_ocupacao: float
     avaliacoes_mes: int = 0
+    treinos_hoje: int = 0
+
+# ==================== TREINOS MODELS ====================
+
+# Exercicio (Biblioteca)
+class Exercicio(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nome: str
+    grupo_muscular: str  # peito, costas, pernas, ombros, biceps, triceps, abdomen, cardio
+    equipamento: str  # barra, halteres, maquina, peso_corporal, funcional, cabos
+    descricao: Optional[str] = None
+    video_url: Optional[str] = None
+    dificuldade: str = "intermediario"  # iniciante, intermediario, avancado
+    imagem_url: Optional[str] = None
+    ativo: bool = True
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ExercicioCreate(BaseModel):
+    nome: str
+    grupo_muscular: str
+    equipamento: str
+    descricao: Optional[str] = None
+    video_url: Optional[str] = None
+    dificuldade: str = "intermediario"
+    imagem_url: Optional[str] = None
+
+class ExercicioUpdate(BaseModel):
+    nome: Optional[str] = None
+    grupo_muscular: Optional[str] = None
+    equipamento: Optional[str] = None
+    descricao: Optional[str] = None
+    video_url: Optional[str] = None
+    dificuldade: Optional[str] = None
+    imagem_url: Optional[str] = None
+    ativo: Optional[bool] = None
+
+# Exercicio na Ficha
+class ExercicioFicha(BaseModel):
+    exercicio_id: str
+    ordem: int
+    series: int
+    repeticoes: str  # "8-12", "15", "AMRAP", "20 segundos"
+    carga: Optional[str] = None  # "20kg", "livre", "dropset"
+    descanso: Optional[str] = None  # "60s", "90s"
+    tecnica: Optional[str] = None  # "dropset", "rest-pause", "superset"
+    observacoes: Optional[str] = None
+
+# Ficha de Treino
+class FichaTreino(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    aluno_id: str
+    aluno_nome: str
+    professor_id: str
+    professor_nome: str
+    nome: str  # Ex: "Treino A - Peito/Tríceps"
+    tipo: str  # ABC, ABCD, Push_Pull_Legs, Upper_Lower, FullBody
+    objetivo: str  # hipertrofia, forca, emagrecimento, condicionamento
+    data_inicio: str
+    data_fim: Optional[str] = None
+    ativo: bool = True
+    divisao: str  # A, B, C, D, Push, Pull, Legs
+    exercicios: List[ExercicioFicha] = []
+    observacoes: Optional[str] = None
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class FichaTreinoCreate(BaseModel):
+    aluno_id: str
+    professor_id: str
+    nome: str
+    tipo: str
+    objetivo: str
+    data_inicio: str
+    data_fim: Optional[str] = None
+    divisao: str
+    exercicios: List[ExercicioFicha] = []
+    observacoes: Optional[str] = None
+
+class FichaTreinoUpdate(BaseModel):
+    nome: Optional[str] = None
+    tipo: Optional[str] = None
+    objetivo: Optional[str] = None
+    data_inicio: Optional[str] = None
+    data_fim: Optional[str] = None
+    ativo: Optional[bool] = None
+    divisao: Optional[str] = None
+    exercicios: Optional[List[ExercicioFicha]] = None
+    observacoes: Optional[str] = None
+
+# Serie Realizada
+class SerieRealizada(BaseModel):
+    numero_serie: int
+    repeticoes: int
+    carga: float  # kg
+    concluida: bool = True
+
+# Exercicio Realizado
+class ExercicioRealizado(BaseModel):
+    exercicio_id: str
+    exercicio_nome: Optional[str] = None
+    series_realizadas: List[SerieRealizada] = []
+
+# Registro de Treino (execução)
+class RegistroTreino(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    aluno_id: str
+    aluno_nome: str
+    ficha_id: str
+    ficha_nome: str
+    data_treino: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    divisao: str
+    exercicios_realizados: List[ExercicioRealizado] = []
+    duracao_minutos: Optional[int] = None
+    observacoes: Optional[str] = None
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RegistroTreinoCreate(BaseModel):
+    aluno_id: str
+    ficha_id: str
+    data_treino: Optional[datetime] = None
+    divisao: str
+    exercicios_realizados: List[ExercicioRealizado] = []
+    duracao_minutos: Optional[int] = None
+    observacoes: Optional[str] = None
+
+# Progressao de Carga
+class ProgressaoCarga(BaseModel):
+    exercicio_id: str
+    exercicio_nome: str
+    historico: List[dict] = []  # [{"data": "...", "carga_media": ..., "carga_maxima": ...}]
 
 # ==================== HELPER FUNCTIONS ====================
 
