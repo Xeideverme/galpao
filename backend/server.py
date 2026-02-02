@@ -312,6 +312,7 @@ class DashboardStats(BaseModel):
     checkins_hoje: int
     pagamentos_pendentes: int
     taxa_ocupacao: float
+    avaliacoes_mes: int = 0
 
 # ==================== HELPER FUNCTIONS ====================
 
