@@ -68,14 +68,14 @@ const PlanosAlimentares = () => {
           <Select value={filtroAluno} onValueChange={setFiltroAluno}>
             <SelectTrigger><SelectValue placeholder="Filtrar por aluno" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               {alunos.map(a => <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filtroStatus} onValueChange={setFiltroStatus}>
             <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="ativo">Ativo</SelectItem>
               <SelectItem value="expirado">Expirado</SelectItem>
               <SelectItem value="arquivado">Arquivado</SelectItem>
