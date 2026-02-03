@@ -50,6 +50,12 @@ Sistema de gestão completo para academias e centros de treinamento.
 - Aderência ao plano
 
 ### 13. Módulo de Relatórios & BI ✅ (03/02/2026)
+
+**Sistema de Alertas Automáticos (`/api/alertas`):**
+- Pagamentos atrasados (prioridade alta - vermelho)
+- Alunos inativos há 7+ dias (prioridade média - amarelo)
+- Alunos que nunca treinaram
+- Clique no alerta navega para página do aluno
 **Hub Central (`/relatorios`):**
 - KPIs resumidos: Alunos Ativos, MRR, Lucro, Ticket Médio, Treinos/Mês
 - 3 cards para navegação aos relatórios detalhados
