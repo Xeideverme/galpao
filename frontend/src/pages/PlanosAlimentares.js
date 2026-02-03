@@ -38,8 +38,8 @@ const PlanosAlimentares = () => {
   };
 
   const filtered = planos.filter(p => {
-    const matchAluno = !filtroAluno || p.aluno_id === filtroAluno;
-    const matchStatus = !filtroStatus || getStatus(p) === filtroStatus;
+    const matchAluno = !filtroAluno || filtroAluno === 'all' || p.aluno_id === filtroAluno;
+    const matchStatus = !filtroStatus || filtroStatus === 'all' || getStatus(p) === filtroStatus;
     return matchAluno && matchStatus;
   });
 
