@@ -19,7 +19,8 @@ import {
   ClipboardList,
   BarChart3,
   Apple,
-  UtensilsCrossed
+  UtensilsCrossed,
+  PieChart
 } from 'lucide-react';
 
 const Layout = () => {
@@ -35,6 +36,7 @@ const Layout = () => {
     { icon: ClipboardList, label: 'Fichas de Treino', path: '/fichas' },
     { icon: Apple, label: 'Alimentos', path: '/alimentos' },
     { icon: UtensilsCrossed, label: 'Planos Alimentares', path: '/planos-alimentares' },
+    { icon: PieChart, label: 'Relatórios', path: '/relatorios' },
     { icon: CreditCard, label: 'Planos', path: '/planos' },
     { icon: DollarSign, label: 'Financeiro', path: '/financeiro' },
     { icon: GraduationCap, label: 'Professores', path: '/professores' },
