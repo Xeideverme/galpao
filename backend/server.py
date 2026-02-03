@@ -1823,6 +1823,229 @@ async def update_registro_alimentar(registro_id: str, registro: RegistroAlimenta
     return RegistroAlimentar(**updated)
 
 
+# ==================== RELATORIOS ROUTES ====================
+
+@api_router.get("/relatorios/financeiro/{periodo}")
+async def get_relatorio_financeiro(periodo: str, current_user: User = Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    
+    # Calcular datas baseado no período
+    if periodo == "mes":
+        data_inicio = now.replace(day=1).strftime("%Y-%m-%d")
+        mes_anterior = (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    elif periodo == "trimestre":
+        mes_atual = now.month
+        trimestre_inicio = ((mes_atual - 1) // 3) * 3 + 1
+        data_inicio = now.replace(month=trimestre_inicio, day=1).strftime("%Y-%m-%d")
+        mes_anterior = None
+    elif periodo == "ano":
+        data_inicio = now.replace(month=1, day=1).strftime("%Y-%m-%d")
+        mes_anterior = None
+    else:  # semana
+        data_inicio = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+        mes_anterior = None
+    
+    mes_atual = now.strftime("%Y-%m")
+    
+    # Pagamentos
+    pagamentos = await db.pagamentos.find({}, {"_id": 0}).to_list(10000)
+    receita_total = sum(p['valor'] for p in pagamentos if p.get('data_pagamento', '') >= data_inicio and p['status'] == 'pago')
+    receita_mes = sum(p['valor'] for p in pagamentos if p.get('data_pagamento', '').startswith(mes_atual) and p['status'] == 'pago')
+    inadimplencia = sum(p['valor'] for p in pagamentos if p['status'] == 'pendente')
+    
+    # Despesas
+    despesas = await db.despesas.find({}, {"_id": 0}).to_list(10000)
+    despesa_total = sum(d['valor'] for d in despesas if d['data'] >= data_inicio)
+    despesa_mes = sum(d['valor'] for d in despesas if d['data'].startswith(mes_atual))
+    
+    # MRR e métricas
+    planos = await db.planos.find({}, {"_id": 0}).to_list(1000)
+    alunos_ativos = await db.alunos.count_documents({"status": "ativo"})
+    
+    # Calcular MRR (receita recorrente)
+    mrr = receita_mes
+    
+    # Receita por mês (últimos 6 meses)
+    receita_por_mes = []
+    for i in range(5, -1, -1):
+        mes = (now - timedelta(days=30*i)).strftime("%Y-%m")
+        total = sum(p['valor'] for p in pagamentos if p.get('data_pagamento', '').startswith(mes) and p['status'] == 'pago')
+        receita_por_mes.append({"mes": mes, "receita": total})
+    
+    # Receita por plano
+    receita_por_plano = {}
+    for p in pagamentos:
+        if p['status'] == 'pago':
+            plano_nome = p.get('plano_nome', 'Outros')
+            receita_por_plano[plano_nome] = receita_por_plano.get(plano_nome, 0) + p['valor']
+    
+    return {
+        "periodo": periodo,
+        "receita_total": receita_total,
+        "despesa_total": despesa_total,
+        "lucro": receita_total - despesa_total,
+        "mrr": mrr,
+        "inadimplencia": inadimplencia,
+        "ticket_medio": round(receita_mes / alunos_ativos, 2) if alunos_ativos else 0,
+        "receita_por_mes": receita_por_mes,
+        "receita_por_plano": [{"plano": k, "valor": v} for k, v in receita_por_plano.items()],
+        "margem_lucro": round(((receita_total - despesa_total) / receita_total) * 100, 1) if receita_total else 0
+    }
+
+@api_router.get("/relatorios/alunos/retencao")
+async def get_relatorio_retencao(current_user: User = Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    mes_atual = now.strftime("%Y-%m")
+    
+    alunos = await db.alunos.find({}, {"_id": 0}).to_list(10000)
+    
+    total = len(alunos)
+    ativos = sum(1 for a in alunos if a['status'] == 'ativo')
+    inativos = sum(1 for a in alunos if a['status'] == 'inativo')
+    novos_mes = sum(1 for a in alunos if a.get('data_cadastro', '').startswith(mes_atual))
+    
+    # Calcular por mês (últimos 6 meses)
+    alunos_por_mes = []
+    for i in range(5, -1, -1):
+        mes = (now - timedelta(days=30*i)).strftime("%Y-%m")
+        novos = sum(1 for a in alunos if a.get('data_cadastro', '').startswith(mes))
+        cancelados = sum(1 for a in alunos if a.get('data_cancelamento', '').startswith(mes))
+        alunos_por_mes.append({"mes": mes, "novos": novos, "cancelados": cancelados})
+    
+    # Churn rate (cancelados / ativos no início do mês)
+    cancelados_mes = sum(1 for a in alunos if a.get('data_cancelamento', '').startswith(mes_atual))
+    churn_rate = round((cancelados_mes / total) * 100, 2) if total else 0
+    
+    # Taxa de retenção
+    retencao = round((ativos / total) * 100, 1) if total else 0
+    
+    # LTV estimado (ticket médio × tempo médio em meses)
+    pagamentos = await db.pagamentos.find({"status": "pago"}, {"_id": 0}).to_list(10000)
+    ticket_medio = sum(p['valor'] for p in pagamentos) / len(pagamentos) if pagamentos else 0
+    ltv = round(ticket_medio * 12, 2)  # Estimativa de 12 meses
+    
+    # Alunos por plano
+    alunos_por_plano = {}
+    for a in alunos:
+        if a['status'] == 'ativo':
+            plano = a.get('plano_nome', 'Sem plano')
+            alunos_por_plano[plano] = alunos_por_plano.get(plano, 0) + 1
+    
+    return {
+        "total_alunos": total,
+        "alunos_ativos": ativos,
+        "alunos_inativos": inativos,
+        "novos_mes": novos_mes,
+        "cancelados_mes": cancelados_mes,
+        "taxa_retencao": retencao,
+        "churn_rate": churn_rate,
+        "ltv_estimado": ltv,
+        "alunos_por_mes": alunos_por_mes,
+        "alunos_por_plano": [{"plano": k, "quantidade": v} for k, v in alunos_por_plano.items()]
+    }
+
+@api_router.get("/relatorios/operacional")
+async def get_relatorio_operacional(current_user: User = Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    mes_atual = now.strftime("%Y-%m")
+    hoje = now.strftime("%Y-%m-%d")
+    
+    # Check-ins
+    checkins = await db.checkins.find({}, {"_id": 0}).to_list(10000)
+    checkins_hoje = sum(1 for c in checkins if c['data_hora'].startswith(hoje))
+    checkins_mes = sum(1 for c in checkins if c['data_hora'].startswith(mes_atual))
+    
+    # Check-ins por dia da semana
+    checkins_por_dia = {i: 0 for i in range(7)}
+    for c in checkins:
+        try:
+            dt = datetime.fromisoformat(c['data_hora'].replace('Z', '+00:00'))
+            checkins_por_dia[dt.weekday()] += 1
+        except:
+            pass
+    dias_semana = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+    checkins_semana = [{"dia": dias_semana[i], "total": checkins_por_dia[i]} for i in range(7)]
+    
+    # Professores
+    professores = await db.professores.find({"ativo": True}, {"_id": 0}).to_list(100)
+    total_professores = len(professores)
+    
+    # Aulas
+    aulas = await db.aulas.find({}, {"_id": 0}).to_list(1000)
+    total_aulas = len(aulas)
+    
+    # Treinos registrados
+    treinos = await db.registros_treino.find({}, {"_id": 0}).to_list(10000)
+    treinos_mes = sum(1 for t in treinos if t.get('data_treino', '').startswith(mes_atual))
+    treinos_hoje = sum(1 for t in treinos if t.get('data_treino', '').startswith(hoje))
+    
+    # Fichas ativas
+    fichas = await db.fichas_treino.find({"ativo": True}, {"_id": 0}).to_list(10000)
+    fichas_ativas = len(fichas)
+    
+    # Taxa de ocupação (estimada)
+    alunos_ativos = await db.alunos.count_documents({"status": "ativo"})
+    capacidade = 200  # Capacidade estimada
+    ocupacao = round((alunos_ativos / capacidade) * 100, 1)
+    
+    # Horários de pico
+    horarios = {}
+    for c in checkins:
+        try:
+            hora = c['data_hora'][11:13]
+            horarios[hora] = horarios.get(hora, 0) + 1
+        except:
+            pass
+    horarios_pico = sorted([{"hora": k, "total": v} for k, v in horarios.items()], key=lambda x: -x['total'])[:5]
+    
+    return {
+        "checkins_hoje": checkins_hoje,
+        "checkins_mes": checkins_mes,
+        "treinos_hoje": treinos_hoje,
+        "treinos_mes": treinos_mes,
+        "fichas_ativas": fichas_ativas,
+        "total_professores": total_professores,
+        "total_aulas": total_aulas,
+        "taxa_ocupacao": ocupacao,
+        "checkins_por_dia_semana": checkins_semana,
+        "horarios_pico": horarios_pico
+    }
+
+@api_router.get("/relatorios/kpis")
+async def get_kpis(current_user: User = Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    mes_atual = now.strftime("%Y-%m")
+    
+    # Alunos
+    total_alunos = await db.alunos.count_documents({})
+    alunos_ativos = await db.alunos.count_documents({"status": "ativo"})
+    
+    # Financeiro
+    pagamentos = await db.pagamentos.find({"status": "pago"}, {"_id": 0}).to_list(10000)
+    receita_mes = sum(p['valor'] for p in pagamentos if p.get('data_pagamento', '').startswith(mes_atual))
+    
+    despesas = await db.despesas.find({}, {"_id": 0}).to_list(10000)
+    despesa_mes = sum(d['valor'] for d in despesas if d['data'].startswith(mes_atual))
+    
+    # Treinos
+    treinos = await db.registros_treino.find({}, {"_id": 0}).to_list(10000)
+    treinos_mes = sum(1 for t in treinos if t.get('data_treino', '').startswith(mes_atual))
+    
+    # Avaliações
+    avaliacoes = await db.avaliacoes_fisicas.find({}, {"_id": 0}).to_list(10000)
+    avaliacoes_mes = sum(1 for a in avaliacoes if a.get('data_avaliacao', '').startswith(mes_atual))
+    
+    return {
+        "alunos_ativos": alunos_ativos,
+        "mrr": receita_mes,
+        "lucro_mes": receita_mes - despesa_mes,
+        "ticket_medio": round(receita_mes / alunos_ativos, 2) if alunos_ativos else 0,
+        "treinos_mes": treinos_mes,
+        "avaliacoes_mes": avaliacoes_mes,
+        "media_treinos_aluno": round(treinos_mes / alunos_ativos, 1) if alunos_ativos else 0
+    }
+
+
 # ==================== DASHBOARD ROUTES ====================
 
 @api_router.get("/dashboard/stats", response_model=DashboardStats)
