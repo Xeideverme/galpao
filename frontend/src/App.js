@@ -89,6 +89,10 @@ function App() {
             <Route path="planos-alimentares/:id" element={<DetalhesPlanoAlimentar />} />
             <Route path="nutricao/registro" element={<RegistrarConsumo />} />
             <Route path="nutricao/relatorio/:alunoId" element={<RelatorioNutricional />} />
+            <Route path="relatorios" element={<Relatorios />} />
+            <Route path="relatorios/financeiro" element={<RelatorioFinanceiro />} />
+            <Route path="relatorios/alunos" element={<RelatorioAlunos />} />
+            <Route path="relatorios/operacional" element={<RelatorioOperacional />} />
           </Route>
         </Routes>
       </BrowserRouter>
