@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-import { BarChart3, TrendingUp, Users, DollarSign, Calendar, Activity } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, DollarSign, Calendar, Activity, AlertTriangle, Bell } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 
