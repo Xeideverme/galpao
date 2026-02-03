@@ -79,6 +79,12 @@ function App() {
             <Route path="treinos/registrar" element={<RegistrarTreino />} />
             <Route path="treinos/historico/:alunoId" element={<HistoricoTreino />} />
             <Route path="treinos/progressao/:alunoId" element={<ProgressaoCarga />} />
+            <Route path="alimentos" element={<Alimentos />} />
+            <Route path="planos-alimentares" element={<PlanosAlimentares />} />
+            <Route path="planos-alimentares/novo" element={<NovoPlanoAlimentar />} />
+            <Route path="planos-alimentares/:id" element={<DetalhesPlanoAlimentar />} />
+            <Route path="nutricao/registro" element={<RegistrarConsumo />} />
+            <Route path="nutricao/relatorio/:alunoId" element={<RelatorioNutricional />} />
           </Route>
         </Routes>
       </BrowserRouter>
