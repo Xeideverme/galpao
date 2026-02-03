@@ -444,7 +444,118 @@ class RegistroTreinoCreate(BaseModel):
 class ProgressaoCarga(BaseModel):
     exercicio_id: str
     exercicio_nome: str
-    historico: List[dict] = []  # [{"data": "...", "carga_media": ..., "carga_maxima": ...}]
+    historico: List[dict] = []
+
+# ==================== NUTRICAO MODELS ====================
+
+class Alimento(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nome: str
+    categoria: str  # proteina, carboidrato, gordura, vegetal, fruta, laticinios
+    porcao_padrao: float = 100
+    calorias_por_100g: float
+    proteinas_por_100g: float
+    carboidratos_por_100g: float
+    gorduras_por_100g: float
+    fibras_por_100g: Optional[float] = None
+    sodio_por_100g: Optional[float] = None
+    indice_glicemico: Optional[int] = None
+    origem: str = "custom"
+    ativo: bool = True
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AlimentoCreate(BaseModel):
+    nome: str
+    categoria: str
+    porcao_padrao: float = 100
+    calorias_por_100g: float
+    proteinas_por_100g: float
+    carboidratos_por_100g: float
+    gorduras_por_100g: float
+    fibras_por_100g: Optional[float] = None
+    sodio_por_100g: Optional[float] = None
+    indice_glicemico: Optional[int] = None
+
+class AlimentoRefeicao(BaseModel):
+    alimento_id: str
+    alimento_nome: Optional[str] = None
+    quantidade: float
+    substituicoes: List[str] = []
+
+class Refeicao(BaseModel):
+    nome: str
+    horario_sugerido: str
+    alimentos: List[AlimentoRefeicao] = []
+
+class PlanoAlimentar(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    aluno_id: str
+    aluno_nome: str
+    nutricionista_id: str
+    nutricionista_nome: str
+    nome: str
+    objetivo: str
+    data_inicio: str
+    data_fim: Optional[str] = None
+    calorias_alvo: int
+    proteinas_alvo: float
+    carboidratos_alvo: float
+    gorduras_alvo: float
+    refeicoes: List[Refeicao] = []
+    restricoes: List[str] = []
+    observacoes: Optional[str] = None
+    ativo: bool = True
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PlanoAlimentarCreate(BaseModel):
+    aluno_id: str
+    nutricionista_id: str
+    nome: str
+    objetivo: str
+    data_inicio: str
+    data_fim: Optional[str] = None
+    calorias_alvo: int
+    proteinas_alvo: float
+    carboidratos_alvo: float
+    gorduras_alvo: float
+    refeicoes: List[Refeicao] = []
+    restricoes: List[str] = []
+    observacoes: Optional[str] = None
+
+class RefeicaoConsumida(BaseModel):
+    nome: str
+    seguiu_plano: bool = True
+    alimentos: List[AlimentoRefeicao] = []
+
+class RegistroAlimentar(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    aluno_id: str
+    aluno_nome: str
+    data: str
+    refeicoes_consumidas: List[RefeicaoConsumida] = []
+    agua_ml: Optional[int] = None
+    peso_dia: Optional[float] = None
+    observacoes: Optional[str] = None
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RegistroAlimentarCreate(BaseModel):
+    aluno_id: str
+    data: str
+    refeicoes_consumidas: List[RefeicaoConsumida] = []
+    agua_ml: Optional[int] = None
+    peso_dia: Optional[float] = None
+    observacoes: Optional[str] = None
+
+class CalculoMacros(BaseModel):
+    peso: float
+    altura: float
+    idade: int
+    sexo: str
+    nivel_atividade: str
+    objetivo: str
 
 # ==================== HELPER FUNCTIONS ====================
 
