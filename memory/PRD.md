@@ -48,6 +48,38 @@ Sistema de gestão completo para academias e centros de treinamento.
 **Relatório Nutricional:**
 - Médias de calorias e macros
 - Aderência ao plano
+
+### 13. Módulo de Relatórios & BI ✅ (03/02/2026)
+**Hub Central (`/relatorios`):**
+- KPIs resumidos: Alunos Ativos, MRR, Lucro, Ticket Médio, Treinos/Mês
+- 3 cards para navegação aos relatórios detalhados
+
+**Relatório Financeiro (`/relatorios/financeiro`):**
+- KPIs: Receita, Despesas, Lucro, Inadimplência, MRR, Ticket Médio, Margem de Lucro
+- Gráfico de barras: Receita por Mês (últimos 6 meses)
+- Gráfico de pizza: Receita por Plano
+- Filtro de período: Semana, Mês, Trimestre, Ano
+
+**Relatório de Alunos (`/relatorios/alunos`):**
+- KPIs: Total, Ativos, Novos (mês), Cancelados (mês)
+- Métricas: Taxa de Retenção, Churn Rate, LTV Estimado
+- Gráfico de barras: Novos vs Cancelados (últimos 6 meses)
+- Gráfico de pizza: Distribuição por Plano
+
+**Relatório Operacional (`/relatorios/operacional`):**
+- KPIs: Check-ins Hoje/Mês, Treinos Hoje/Mês
+- Métricas: Fichas Ativas, Professores, Aulas, Taxa de Ocupação
+- Gráfico de barras: Check-ins por Dia da Semana
+- Visualização: Horários de Pico
+
+## Próximas Tarefas (Backlog)
+- **P1:** Implementar WhatsApp via Twilio
+- **P1:** Recursos avançados Treino (drag-drop real, timers)
+- **P1:** Recursos avançados Nutrição (importar TACO completo, cardápios)
+- **P2:** Exportação de relatórios (PDF/Excel)
+- **P2:** Comparação MoM/YoY nos relatórios
+- **P2:** Refatorar server.py (modularizar rotas/models)
+- **P3:** Remover dados de seed quando aprovado
 - Evolução do peso
 
 ## Credenciais de Teste
