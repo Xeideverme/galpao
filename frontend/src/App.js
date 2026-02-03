@@ -27,6 +27,10 @@ import NovoPlanoAlimentar from './pages/NovoPlanoAlimentar';
 import DetalhesPlanoAlimentar from './pages/DetalhesPlanoAlimentar';
 import RegistrarConsumo from './pages/RegistrarConsumo';
 import RelatorioNutricional from './pages/RelatorioNutricional';
+import Relatorios from './pages/Relatorios';
+import RelatorioFinanceiro from './pages/RelatorioFinanceiro';
+import RelatorioAlunos from './pages/RelatorioAlunos';
+import RelatorioOperacional from './pages/RelatorioOperacional';
 import '@/App.css';
 
 const PrivateRoute = ({ children }) => {
