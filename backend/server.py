@@ -1566,6 +1566,265 @@ async def get_calendario_treinos(aluno_id: str, current_user: User = Depends(get
     
     return calendario
 
+
+# ==================== NUTRICAO ROUTES ====================
+
+@api_router.post("/alimentos", response_model=Alimento)
+async def create_alimento(alimento: AlimentoCreate, current_user: User = Depends(get_current_user)):
+    existing = await db.alimentos.find_one({"nome": alimento.nome}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Alimento já existe")
+    
+    alimento_obj = Alimento(**alimento.model_dump())
+    doc = alimento_obj.model_dump()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    await db.alimentos.insert_one(doc)
+    return alimento_obj
+
+@api_router.get("/alimentos", response_model=List[Alimento])
+async def get_alimentos(categoria: Optional[str] = None, busca: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    query = {"ativo": True}
+    if categoria:
+        query['categoria'] = categoria
+    
+    alimentos = await db.alimentos.find(query, {"_id": 0}).sort("nome", 1).to_list(5000)
+    
+    if busca:
+        busca_lower = busca.lower()
+        alimentos = [a for a in alimentos if busca_lower in a['nome'].lower()]
+    
+    for a in alimentos:
+        if isinstance(a['criado_em'], str):
+            a['criado_em'] = datetime.fromisoformat(a['criado_em'])
+    return alimentos
+
+@api_router.get("/alimentos/{alimento_id}", response_model=Alimento)
+async def get_alimento(alimento_id: str, current_user: User = Depends(get_current_user)):
+    alimento = await db.alimentos.find_one({"id": alimento_id}, {"_id": 0})
+    if not alimento:
+        raise HTTPException(status_code=404, detail="Alimento não encontrado")
+    if isinstance(alimento['criado_em'], str):
+        alimento['criado_em'] = datetime.fromisoformat(alimento['criado_em'])
+    return Alimento(**alimento)
+
+@api_router.put("/alimentos/{alimento_id}", response_model=Alimento)
+async def update_alimento(alimento_id: str, alimento: AlimentoCreate, current_user: User = Depends(get_current_user)):
+    result = await db.alimentos.update_one({"id": alimento_id}, {"$set": alimento.model_dump()})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Alimento não encontrado")
+    updated = await db.alimentos.find_one({"id": alimento_id}, {"_id": 0})
+    if isinstance(updated['criado_em'], str):
+        updated['criado_em'] = datetime.fromisoformat(updated['criado_em'])
+    return Alimento(**updated)
+
+@api_router.delete("/alimentos/{alimento_id}")
+async def delete_alimento(alimento_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.alimentos.delete_one({"id": alimento_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Alimento não encontrado")
+    return {"message": "Alimento deletado"}
+
+@api_router.post("/planos-alimentares", response_model=PlanoAlimentar)
+async def create_plano_alimentar(plano: PlanoAlimentarCreate, current_user: User = Depends(get_current_user)):
+    aluno = await db.alunos.find_one({"id": plano.aluno_id}, {"_id": 0})
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado")
+    
+    professor = await db.professores.find_one({"id": plano.nutricionista_id}, {"_id": 0})
+    if not professor:
+        raise HTTPException(status_code=404, detail="Nutricionista não encontrado")
+    
+    plano_data = plano.model_dump()
+    plano_data['aluno_nome'] = aluno['nome']
+    plano_data['nutricionista_nome'] = professor['nome']
+    
+    # Add alimento names to refeicoes
+    for refeicao in plano_data['refeicoes']:
+        for alimento_ref in refeicao['alimentos']:
+            alimento = await db.alimentos.find_one({"id": alimento_ref['alimento_id']}, {"_id": 0})
+            if alimento:
+                alimento_ref['alimento_nome'] = alimento['nome']
+    
+    plano_obj = PlanoAlimentar(**plano_data)
+    doc = plano_obj.model_dump()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    await db.planos_alimentares.insert_one(doc)
+    return plano_obj
+
+@api_router.get("/planos-alimentares", response_model=List[PlanoAlimentar])
+async def get_planos_alimentares(aluno_id: Optional[str] = None, ativo: Optional[bool] = None, current_user: User = Depends(get_current_user)):
+    query = {}
+    if aluno_id:
+        query['aluno_id'] = aluno_id
+    if ativo is not None:
+        query['ativo'] = ativo
+    
+    planos = await db.planos_alimentares.find(query, {"_id": 0}).sort("criado_em", -1).to_list(1000)
+    for p in planos:
+        if isinstance(p['criado_em'], str):
+            p['criado_em'] = datetime.fromisoformat(p['criado_em'])
+    return planos
+
+@api_router.get("/planos-alimentares/{plano_id}", response_model=PlanoAlimentar)
+async def get_plano_alimentar(plano_id: str, current_user: User = Depends(get_current_user)):
+    plano = await db.planos_alimentares.find_one({"id": plano_id}, {"_id": 0})
+    if not plano:
+        raise HTTPException(status_code=404, detail="Plano não encontrado")
+    if isinstance(plano['criado_em'], str):
+        plano['criado_em'] = datetime.fromisoformat(plano['criado_em'])
+    return PlanoAlimentar(**plano)
+
+@api_router.put("/planos-alimentares/{plano_id}", response_model=PlanoAlimentar)
+async def update_plano_alimentar(plano_id: str, plano: PlanoAlimentarCreate, current_user: User = Depends(get_current_user)):
+    aluno = await db.alunos.find_one({"id": plano.aluno_id}, {"_id": 0})
+    professor = await db.professores.find_one({"id": plano.nutricionista_id}, {"_id": 0})
+    
+    update_data = plano.model_dump()
+    update_data['aluno_nome'] = aluno['nome'] if aluno else ''
+    update_data['nutricionista_nome'] = professor['nome'] if professor else ''
+    
+    result = await db.planos_alimentares.update_one({"id": plano_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Plano não encontrado")
+    
+    updated = await db.planos_alimentares.find_one({"id": plano_id}, {"_id": 0})
+    if isinstance(updated['criado_em'], str):
+        updated['criado_em'] = datetime.fromisoformat(updated['criado_em'])
+    return PlanoAlimentar(**updated)
+
+@api_router.delete("/planos-alimentares/{plano_id}")
+async def delete_plano_alimentar(plano_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.planos_alimentares.delete_one({"id": plano_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Plano não encontrado")
+    return {"message": "Plano deletado"}
+
+@api_router.get("/planos-alimentares/aluno/{aluno_id}/ativo", response_model=Optional[PlanoAlimentar])
+async def get_plano_ativo_aluno(aluno_id: str, current_user: User = Depends(get_current_user)):
+    hoje = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    plano = await db.planos_alimentares.find_one({
+        "aluno_id": aluno_id,
+        "ativo": True,
+        "$or": [{"data_fim": None}, {"data_fim": {"$gte": hoje}}]
+    }, {"_id": 0})
+    if plano and isinstance(plano['criado_em'], str):
+        plano['criado_em'] = datetime.fromisoformat(plano['criado_em'])
+    return PlanoAlimentar(**plano) if plano else None
+
+@api_router.post("/planos-alimentares/calcular-macros")
+async def calcular_macros(dados: CalculoMacros, current_user: User = Depends(get_current_user)):
+    # TMB (Mifflin-St Jeor)
+    if dados.sexo.lower() == 'masculino':
+        tmb = (10 * dados.peso) + (6.25 * dados.altura) - (5 * dados.idade) + 5
+    else:
+        tmb = (10 * dados.peso) + (6.25 * dados.altura) - (5 * dados.idade) - 161
+    
+    # TDEE
+    fatores = {"sedentario": 1.2, "leve": 1.375, "moderado": 1.55, "intenso": 1.725, "muito_intenso": 1.9}
+    fator = fatores.get(dados.nivel_atividade, 1.55)
+    tdee = tmb * fator
+    
+    # Ajuste por objetivo
+    if dados.objetivo == "emagrecimento":
+        calorias = tdee - 500
+    elif dados.objetivo == "hipertrofia":
+        calorias = tdee + 300
+    else:
+        calorias = tdee
+    
+    # Macros
+    proteinas = dados.peso * 2  # 2g/kg
+    gorduras = (calorias * 0.25) / 9  # 25% das calorias, 9 cal/g
+    carboidratos = (calorias - (proteinas * 4) - (gorduras * 9)) / 4  # restante
+    
+    return {
+        "tmb": round(tmb, 0),
+        "tdee": round(tdee, 0),
+        "calorias_alvo": round(calorias, 0),
+        "proteinas_alvo": round(proteinas, 1),
+        "carboidratos_alvo": round(carboidratos, 1),
+        "gorduras_alvo": round(gorduras, 1)
+    }
+
+@api_router.post("/registros-alimentares", response_model=RegistroAlimentar)
+async def create_registro_alimentar(registro: RegistroAlimentarCreate, current_user: User = Depends(get_current_user)):
+    aluno = await db.alunos.find_one({"id": registro.aluno_id}, {"_id": 0})
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado")
+    
+    registro_data = registro.model_dump()
+    registro_data['aluno_nome'] = aluno['nome']
+    
+    registro_obj = RegistroAlimentar(**registro_data)
+    doc = registro_obj.model_dump()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    await db.registros_alimentares.insert_one(doc)
+    return registro_obj
+
+@api_router.get("/registros-alimentares/aluno/{aluno_id}", response_model=List[RegistroAlimentar])
+async def get_registros_alimentares(aluno_id: str, current_user: User = Depends(get_current_user)):
+    registros = await db.registros_alimentares.find({"aluno_id": aluno_id}, {"_id": 0}).sort("data", -1).to_list(1000)
+    for r in registros:
+        if isinstance(r['criado_em'], str):
+            r['criado_em'] = datetime.fromisoformat(r['criado_em'])
+    return registros
+
+@api_router.get("/registros-alimentares/aluno/{aluno_id}/relatorio")
+async def get_relatorio_nutricional(aluno_id: str, dias: int = 7, current_user: User = Depends(get_current_user)):
+    registros = await db.registros_alimentares.find({"aluno_id": aluno_id}, {"_id": 0}).sort("data", -1).to_list(dias)
+    
+    # Buscar plano ativo
+    plano = await db.planos_alimentares.find_one({"aluno_id": aluno_id, "ativo": True}, {"_id": 0})
+    
+    total_calorias = 0
+    total_proteinas = 0
+    total_carboidratos = 0
+    total_gorduras = 0
+    dias_seguiu = 0
+    pesos = []
+    
+    for reg in registros:
+        for ref in reg.get('refeicoes_consumidas', []):
+            if ref.get('seguiu_plano'):
+                dias_seguiu += 1
+            for alim in ref.get('alimentos', []):
+                alimento = await db.alimentos.find_one({"id": alim['alimento_id']}, {"_id": 0})
+                if alimento:
+                    fator = alim['quantidade'] / 100
+                    total_calorias += alimento['calorias_por_100g'] * fator
+                    total_proteinas += alimento['proteinas_por_100g'] * fator
+                    total_carboidratos += alimento['carboidratos_por_100g'] * fator
+                    total_gorduras += alimento['gorduras_por_100g'] * fator
+        
+        if reg.get('peso_dia'):
+            pesos.append({"data": reg['data'], "peso": reg['peso_dia']})
+    
+    n = len(registros) or 1
+    return {
+        "periodo_dias": dias,
+        "registros_encontrados": len(registros),
+        "media_calorias": round(total_calorias / n, 0),
+        "media_proteinas": round(total_proteinas / n, 1),
+        "media_carboidratos": round(total_carboidratos / n, 1),
+        "media_gorduras": round(total_gorduras / n, 1),
+        "aderencia_percentual": round((dias_seguiu / n) * 100, 1) if n else 0,
+        "evolucao_peso": pesos,
+        "meta_calorias": plano['calorias_alvo'] if plano else None
+    }
+
+@api_router.put("/registros-alimentares/{registro_id}", response_model=RegistroAlimentar)
+async def update_registro_alimentar(registro_id: str, registro: RegistroAlimentarCreate, current_user: User = Depends(get_current_user)):
+    result = await db.registros_alimentares.update_one({"id": registro_id}, {"$set": registro.model_dump()})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    updated = await db.registros_alimentares.find_one({"id": registro_id}, {"_id": 0})
+    if isinstance(updated['criado_em'], str):
+        updated['criado_em'] = datetime.fromisoformat(updated['criado_em'])
+    return RegistroAlimentar(**updated)
+
+
+# ==================== DASHBOARD ROUTES ====================
+
 @api_router.get("/dashboard/stats", response_model=DashboardStats)
 async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
     # Total alunos
