@@ -21,6 +21,12 @@ import DetalhesFicha from './pages/DetalhesFicha';
 import RegistrarTreino from './pages/RegistrarTreino';
 import HistoricoTreino from './pages/HistoricoTreino';
 import ProgressaoCarga from './pages/ProgressaoCarga';
+import Alimentos from './pages/Alimentos';
+import PlanosAlimentares from './pages/PlanosAlimentares';
+import NovoPlanoAlimentar from './pages/NovoPlanoAlimentar';
+import DetalhesPlanoAlimentar from './pages/DetalhesPlanoAlimentar';
+import RegistrarConsumo from './pages/RegistrarConsumo';
+import RelatorioNutricional from './pages/RelatorioNutricional';
 import '@/App.css';
 
 const PrivateRoute = ({ children }) => {
