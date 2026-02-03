@@ -84,6 +84,34 @@ const Relatorios = () => {
           </div>
         ))}
       </div>
+
+      {/* Alertas */}
+      {alertas.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border p-6" data-testid="alertas-section">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="text-orange-500" size={20} />
+            <h3 className="font-semibold text-lg">Alertas ({alertas.length})</h3>
+          </div>
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            {alertas.map((alerta, i) => (
+              <div 
+                key={i} 
+                className={`p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-50 ${
+                  alerta.prioridade === 'alta' ? 'bg-red-50 border-red-500' : 'bg-yellow-50 border-yellow-500'
+                }`}
+                onClick={() => navigate(`/alunos/${alerta.aluno_id}`)}
+                data-testid={`alerta-${i}`}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} className={alerta.prioridade === 'alta' ? 'text-red-500' : 'text-yellow-500'} />
+                  <span className="font-medium text-sm">{alerta.titulo}</span>
+                </div>
+                <p className="text-xs text-gray-600 mt-1 ml-6">{alerta.descricao}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
