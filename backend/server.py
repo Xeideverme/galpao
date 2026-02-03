@@ -2098,6 +2098,66 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         treinos_hoje=treinos_hoje
     )
 
+# ==================== ALERTAS ROUTES ====================
+
+@api_router.get("/alertas")
+async def get_alertas(current_user: User = Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    hoje = now.strftime("%Y-%m-%d")
+    alertas = []
+    
+    # Pagamentos atrasados
+    pagamentos = await db.pagamentos.find({"status": "pendente"}, {"_id": 0}).to_list(10000)
+    for p in pagamentos:
+        if p.get('data_vencimento', '') < hoje:
+            alertas.append({
+                "tipo": "pagamento_atrasado",
+                "prioridade": "alta",
+                "titulo": f"Pagamento atrasado: {p['aluno_nome']}",
+                "descricao": f"R$ {p['valor']} - Venc: {p['data_vencimento']}",
+                "aluno_id": p['aluno_id'],
+                "aluno_nome": p['aluno_nome']
+            })
+    
+    # Alunos inativos (sem treino há 7+ dias)
+    alunos = await db.alunos.find({"status": "ativo"}, {"_id": 0}).to_list(10000)
+    registros = await db.registros_treino.find({}, {"_id": 0}).to_list(10000)
+    
+    limite = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    for aluno in alunos:
+        treinos_aluno = [r for r in registros if r.get('aluno_id') == aluno['id']]
+        if treinos_aluno:
+            ultimo = max(r.get('data_treino', '')[:10] for r in treinos_aluno)
+            if ultimo < limite:
+                dias = (now - datetime.fromisoformat(ultimo + "T00:00:00+00:00")).days
+                alertas.append({
+                    "tipo": "aluno_inativo",
+                    "prioridade": "media",
+                    "titulo": f"Aluno inativo: {aluno['nome']}",
+                    "descricao": f"Sem treinar há {dias} dias",
+                    "aluno_id": aluno['id'],
+                    "aluno_nome": aluno['nome']
+                })
+        elif aluno.get('data_matricula'):
+            # Aluno nunca treinou
+            matricula = aluno['data_matricula'][:10] if isinstance(aluno['data_matricula'], str) else aluno['data_matricula'].strftime("%Y-%m-%d")
+            if matricula < limite:
+                alertas.append({
+                    "tipo": "aluno_inativo",
+                    "prioridade": "media",
+                    "titulo": f"Aluno nunca treinou: {aluno['nome']}",
+                    "descricao": "Matriculado mas sem registros de treino",
+                    "aluno_id": aluno['id'],
+                    "aluno_nome": aluno['nome']
+                })
+    
+    # Ordenar por prioridade
+    ordem = {"alta": 0, "media": 1, "baixa": 2}
+    alertas.sort(key=lambda x: ordem.get(x['prioridade'], 9))
+    
+    return {"alertas": alertas, "total": len(alertas)}
+
+
 # ==================== ROOT ROUTES ====================
 
 @api_router.get("/")
