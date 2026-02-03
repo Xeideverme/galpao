@@ -54,7 +54,7 @@ const Alimentos = () => {
 
   const filtered = alimentos.filter(a => {
     const matchSearch = a.nome.toLowerCase().includes(search.toLowerCase());
-    const matchCategoria = !filtroCategoria || a.categoria === filtroCategoria;
+    const matchCategoria = !filtroCategoria || filtroCategoria === 'all' || a.categoria === filtroCategoria;
     return matchSearch && matchCategoria;
   });
 
