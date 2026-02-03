@@ -12,12 +12,19 @@ const Relatorios = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
   const [kpis, setKpis] = useState(null);
+  const [alertas, setAlertas] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/relatorios/kpis`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => setKpis(res.data))
-      .catch(() => toast.error('Erro ao carregar KPIs'))
+    Promise.all([
+      axios.get(`${API_URL}/api/relatorios/kpis`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${API_URL}/api/alertas`, { headers: { Authorization: `Bearer ${token}` } })
+    ])
+      .then(([kpisRes, alertasRes]) => {
+        setKpis(kpisRes.data);
+        setAlertas(alertasRes.data.alertas || []);
+      })
+      .catch(() => toast.error('Erro ao carregar dados'))
       .finally(() => setLoading(false));
   }, []);
 
