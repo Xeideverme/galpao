@@ -3,7 +3,7 @@
 ## Visão Geral
 Sistema de gestão completo para academias e centros de treinamento.
 
-## Stack Técnica
+## Stack
 - Backend: FastAPI + MongoDB
 - Frontend: React 19 + Tailwind CSS + Radix UI
 - Auth: JWT
@@ -11,59 +11,44 @@ Sistema de gestão completo para academias e centros de treinamento.
 ## Módulos Implementados
 
 ### 1. Autenticação ✅
-- Login/Registro com JWT
-- Roles: admin, recepcao, professor
-
 ### 2. CRM - Gestão de Alunos ✅
-- CRUD completo de alunos
-- Status: ativo/inativo/pendente
-
 ### 3. Planos ✅
-- CRUD de planos com modalidades
-
 ### 4. Financeiro ✅
-- Pagamentos e despesas
-- Status de pagamento
-
 ### 5. Professores ✅
-- CRUD de professores
-
 ### 6. Aulas ✅
-- Gestão de aulas por modalidade
-
 ### 7. Check-ins ✅
-- Registro de entrada de alunos
-
 ### 8. Equipamentos ✅
-- Inventário e manutenção
-
-### 9. WhatsApp ✅ (MOCKED)
-- Estrutura pronta, integração Twilio pendente
-
+### 9. WhatsApp ✅ (MOCKED - Twilio pendente)
 ### 10. Avaliações Físicas ✅
-- Medidas corporais
-- Histórico e comparações
 
 ### 11. Módulo de Treinos ✅ (02/02/2026)
-**Biblioteca de Exercícios:**
 - 131 exercícios pré-cadastrados
-- Filtros por grupo muscular, equipamento, dificuldade
-- Suporte a vídeos YouTube
+- Fichas de treino com wizard 3 passos + drag & drop
+- Registro de treino com timer
+- Progressão de carga com gráficos
+- Calendário de treinos
 
-**Fichas de Treino:**
-- Wizard 3 passos para criação
-- Drag & Drop para reordenar exercícios
-- Tipos: ABC, ABCD, Push/Pull/Legs, Upper/Lower, FullBody
-- Duplicar e arquivar fichas
+### 12. Módulo de Nutrição ✅ (03/02/2026)
+**Alimentos:**
+- 53 alimentos pré-cadastrados (TACO)
+- Filtros por categoria
+- Calorias e macros por 100g
 
-**Registro de Treino:**
-- Timer/cronômetro
-- Registro de séries/reps/carga
-- Histórico com calendário
+**Planos Alimentares:**
+- Wizard 4 passos
+- Cálculo automático TMB/TDEE (Mifflin-St Jeor)
+- Distribuição de macros
+- Montagem de refeições com busca de alimentos
+- Gráfico de distribuição de macros
 
-**Progressão de Carga:**
-- Gráfico de evolução
-- Carga média e máxima por exercício
+**Registro de Consumo:**
+- Checklist de refeições seguidas
+- Registro de água e peso diário
+
+**Relatório Nutricional:**
+- Médias de calorias e macros
+- Aderência ao plano
+- Evolução do peso
 
 ## Credenciais de Teste
 - Email: admin@nextfit.com
@@ -71,9 +56,10 @@ Sistema de gestão completo para academias e centros de treinamento.
 
 ## Próximas Tarefas (P1)
 - Integrar WhatsApp com Twilio
-- Testar todos os módulos em profundidade
+- Gerar cardápio semanal automático
+- Lista de compras
 
 ## Backlog (P2)
-- Remover dados de seed quando aprovado
-- Refatorar server.py em módulos
-- Templates de fichas prontas
+- Remover dados de seed
+- Refatorar server.py
+- Importar tabela TACO completa
