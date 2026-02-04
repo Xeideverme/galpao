@@ -20,7 +20,9 @@ import {
   BarChart3,
   Apple,
   UtensilsCrossed,
-  PieChart
+  PieChart,
+  FileText,
+  Trophy
 } from 'lucide-react';
 
 const Layout = () => {
@@ -36,8 +38,10 @@ const Layout = () => {
     { icon: ClipboardList, label: 'Fichas de Treino', path: '/fichas' },
     { icon: Apple, label: 'Alimentos', path: '/alimentos' },
     { icon: UtensilsCrossed, label: 'Planos Alimentares', path: '/planos-alimentares' },
+    { icon: Trophy, label: 'Gamificação', path: '/gamificacao' },
     { icon: PieChart, label: 'Relatórios', path: '/relatorios' },
     { icon: CreditCard, label: 'Planos', path: '/planos' },
+    { icon: FileText, label: 'Contratos', path: '/contratos' },
     { icon: DollarSign, label: 'Financeiro', path: '/financeiro' },
     { icon: GraduationCap, label: 'Professores', path: '/professores' },
     { icon: Calendar, label: 'Aulas', path: '/aulas' },

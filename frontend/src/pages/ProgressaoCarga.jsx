@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import ProgressaoGrafico from '../components/ProgressaoGrafico';
 import { toast } from 'sonner';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:7777';
 
 const ProgressaoCarga = () => {
   const { alunoId } = useParams();

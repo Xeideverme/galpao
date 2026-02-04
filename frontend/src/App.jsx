@@ -31,6 +31,16 @@ import Relatorios from './pages/Relatorios';
 import RelatorioFinanceiro from './pages/RelatorioFinanceiro';
 import RelatorioAlunos from './pages/RelatorioAlunos';
 import RelatorioOperacional from './pages/RelatorioOperacional';
+import Contratos from './pages/Contratos';
+import ContratoTemplates from './pages/ContratoTemplates';
+import NovoContrato from './pages/NovoContrato';
+import DetalhesContrato from './pages/DetalhesContrato';
+import AssinarContrato from './pages/AssinarContrato';
+// Gamificação
+import Gamificacao from './pages/Gamificacao';
+import Conquistas from './pages/Conquistas';
+import MinhasConquistas from './pages/MinhasConquistas';
+import Ranking from './pages/Ranking';
 import '@/App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -93,6 +103,16 @@ function App() {
             <Route path="relatorios/financeiro" element={<RelatorioFinanceiro />} />
             <Route path="relatorios/alunos" element={<RelatorioAlunos />} />
             <Route path="relatorios/operacional" element={<RelatorioOperacional />} />
+            <Route path="contratos" element={<Contratos />} />
+            <Route path="contratos/templates" element={<ContratoTemplates />} />
+            <Route path="contratos/novo" element={<NovoContrato />} />
+            <Route path="contratos/:id" element={<DetalhesContrato />} />
+            <Route path="contratos/:id/assinar" element={<AssinarContrato />} />
+            {/* Gamificação */}
+            <Route path="gamificacao" element={<Gamificacao />} />
+            <Route path="conquistas" element={<Conquistas />} />
+            <Route path="minhas-conquistas" element={<MinhasConquistas />} />
+            <Route path="ranking" element={<Ranking />} />
           </Route>
         </Routes>
       </BrowserRouter>

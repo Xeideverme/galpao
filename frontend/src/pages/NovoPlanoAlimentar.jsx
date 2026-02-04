@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import GraficoMacros from '../components/GraficoMacros';
 import { toast } from 'sonner';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:7777';
 
 const objetivos = [
   { value: 'emagrecimento', label: 'Emagrecimento' },

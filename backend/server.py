@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -8,10 +8,15 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional
+from enum import Enum
 import uuid
 from datetime import datetime, timezone, timedelta, date
 import jwt
 from passlib.context import CryptContext
+
+# Logging Setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -31,6 +36,41 @@ security = HTTPBearer()
 
 # Create the main app
 app = FastAPI(title="NextFit CRM+ERP")
+
+# Troubleshooting & Logging Middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    origin = request.headers.get('origin')
+    logger.info(f"Incoming request: {request.method} {request.url.path} | Origin: {origin}")
+    
+    try:
+        response = await call_next(request)
+        logger.info(f"Response status: {response.status_code}")
+        return response
+    except Exception as e:
+        logger.error(f"Request failed: {str(e)}")
+        raise e
+
+# CORS Configuration
+# We specify explicit origins which allows us to use allow_credentials=True
+origins = [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
 api_router = APIRouter(prefix="/api")
 
 # ==================== MODELS ====================
@@ -2158,6 +2198,424 @@ async def get_alertas(current_user: User = Depends(get_current_user)):
     return {"alertas": alertas, "total": len(alertas)}
 
 
+# ==================== CONTRATOS DIGITAIS - MODELS ====================
+
+class ContratoTemplate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nome: str  # "Contrato Mensal Padrão", "Contrato Anual Premium"
+    tipo: str  # mensal, trimestral, semestral, anual
+    conteudo_html: str  # HTML do contrato com placeholders {{aluno_nome}}, {{valor}}, etc
+    clausulas: List[str] = []  # Lista de cláusulas importantes
+    ativo: bool = True
+    versao: int = 1
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    atualizado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ContratoTemplateCreate(BaseModel):
+    nome: str
+    tipo: str
+    conteudo_html: str
+    clausulas: List[str] = []
+
+class Contrato(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    aluno_id: str
+    aluno_nome: str
+    template_id: str
+    template_nome: str
+    plano_id: Optional[str] = None
+    plano_nome: Optional[str] = None
+    
+    # Dados do contrato
+    numero_contrato: str  # AUTO-GERADO: "CTRT-2026-0001"
+    valor_total: float
+    valor_mensal: float
+    data_inicio: str
+    data_fim: str
+    duracao_meses: int
+    
+    # Status e assinatura
+    status: str = "pendente"  # pendente, assinado, ativo, vencido, cancelado
+    conteudo_gerado: str  # HTML final com dados preenchidos
+    assinatura_aluno: Optional[str] = None  # Base64 da assinatura
+    assinatura_responsavel: Optional[str] = None  # Base64
+    data_assinatura: Optional[datetime] = None
+    ip_assinatura: Optional[str] = None
+    
+    # Automação
+    renovacao_automatica: bool = False
+    dia_vencimento: int = 5  # Todo dia 5 do mês
+    
+    # Emails
+    email_enviado: bool = False
+    data_email: Optional[datetime] = None
+    
+    observacoes: Optional[str] = None
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    atualizado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ContratoCreate(BaseModel):
+    aluno_id: str
+    template_id: str
+    plano_id: Optional[str] = None
+    valor_total: float
+    valor_mensal: float
+    data_inicio: str  # "2026-02-01"
+    data_fim: str
+    duracao_meses: int
+    renovacao_automatica: bool = False
+    dia_vencimento: int = 5
+
+class ContratoAssinar(BaseModel):
+    assinatura_aluno: str  # Base64 da assinatura
+    assinatura_responsavel: Optional[str] = None
+    ip_address: Optional[str] = None
+
+
+# ==================== CONTRATOS - TEMPLATES ROUTES ====================
+
+@api_router.post("/contratos/templates", response_model=ContratoTemplate)
+async def criar_template_contrato(
+    template: ContratoTemplateCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Criar novo template de contrato"""
+    template_obj = ContratoTemplate(**template.model_dump())
+    doc = template_obj.model_dump()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    doc['atualizado_em'] = doc['atualizado_em'].isoformat()
+    
+    await db.contratos_templates.insert_one(doc)
+    return template_obj
+
+@api_router.get("/contratos/templates", response_model=List[ContratoTemplate])
+async def listar_templates(
+    ativo: Optional[bool] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Listar templates de contrato"""
+    query = {}
+    if ativo is not None:
+        query["ativo"] = ativo
+    
+    templates = await db.contratos_templates.find(query, {"_id": 0}).to_list(100)
+    for t in templates:
+        if isinstance(t.get('criado_em'), str):
+            t['criado_em'] = datetime.fromisoformat(t['criado_em'])
+        if isinstance(t.get('atualizado_em'), str):
+            t['atualizado_em'] = datetime.fromisoformat(t['atualizado_em'])
+    return templates
+
+@api_router.get("/contratos/templates/{id}", response_model=ContratoTemplate)
+async def obter_template(
+    id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Obter template específico"""
+    template = await db.contratos_templates.find_one({"id": id}, {"_id": 0})
+    if not template:
+        raise HTTPException(404, "Template não encontrado")
+    
+    if isinstance(template.get('criado_em'), str):
+        template['criado_em'] = datetime.fromisoformat(template['criado_em'])
+    if isinstance(template.get('atualizado_em'), str):
+        template['atualizado_em'] = datetime.fromisoformat(template['atualizado_em'])
+    return ContratoTemplate(**template)
+
+@api_router.put("/contratos/templates/{id}", response_model=ContratoTemplate)
+async def atualizar_template(
+    id: str,
+    updates: ContratoTemplateCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Atualizar template"""
+    template = await db.contratos_templates.find_one({"id": id}, {"_id": 0})
+    if not template:
+        raise HTTPException(404, "Template não encontrado")
+    
+    update_dict = updates.model_dump()
+    update_dict["atualizado_em"] = datetime.now(timezone.utc).isoformat()
+    update_dict["versao"] = template.get("versao", 1) + 1
+    
+    await db.contratos_templates.update_one(
+        {"id": id},
+        {"$set": update_dict}
+    )
+    
+    updated = await db.contratos_templates.find_one({"id": id}, {"_id": 0})
+    if isinstance(updated.get('criado_em'), str):
+        updated['criado_em'] = datetime.fromisoformat(updated['criado_em'])
+    if isinstance(updated.get('atualizado_em'), str):
+        updated['atualizado_em'] = datetime.fromisoformat(updated['atualizado_em'])
+    return ContratoTemplate(**updated)
+
+@api_router.delete("/contratos/templates/{id}")
+async def deletar_template(
+    id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Deletar template (desativar)"""
+    result = await db.contratos_templates.update_one(
+        {"id": id},
+        {"$set": {"ativo": False, "atualizado_em": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(404, "Template não encontrado")
+    return {"message": "Template desativado com sucesso"}
+
+
+# ==================== CONTRATOS - GESTÃO ROUTES ====================
+
+@api_router.post("/contratos", response_model=Contrato)
+async def criar_contrato(
+    contrato: ContratoCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Criar novo contrato"""
+    
+    # Buscar aluno
+    aluno = await db.alunos.find_one({"id": contrato.aluno_id}, {"_id": 0})
+    if not aluno:
+        raise HTTPException(404, "Aluno não encontrado")
+    
+    # Buscar template
+    template = await db.contratos_templates.find_one({"id": contrato.template_id}, {"_id": 0})
+    if not template:
+        raise HTTPException(404, "Template não encontrado")
+    
+    # Buscar plano (opcional)
+    plano_nome = None
+    if contrato.plano_id:
+        plano = await db.planos.find_one({"id": contrato.plano_id}, {"_id": 0})
+        if plano:
+            plano_nome = plano.get("nome")
+    
+    # Gerar número do contrato
+    count = await db.contratos.count_documents({})
+    numero_contrato = f"CTRT-{datetime.now().year}-{str(count + 1).zfill(4)}"
+    
+    # Gerar conteúdo do contrato (substituir placeholders)
+    conteudo = template["conteudo_html"]
+    replacements = {
+        "{{aluno_nome}}": aluno["nome"],
+        "{{aluno_cpf}}": aluno.get("cpf", "N/A"),
+        "{{aluno_email}}": aluno.get("email", "N/A"),
+        "{{aluno_telefone}}": aluno.get("telefone", "N/A"),
+        "{{numero_contrato}}": numero_contrato,
+        "{{valor_total}}": f"R$ {contrato.valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+        "{{valor_mensal}}": f"R$ {contrato.valor_mensal:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+        "{{data_inicio}}": contrato.data_inicio,
+        "{{data_fim}}": contrato.data_fim,
+        "{{duracao_meses}}": str(contrato.duracao_meses),
+        "{{plano_nome}}": plano_nome or "N/A",
+        "{{dia_vencimento}}": str(contrato.dia_vencimento),
+        "{{data_atual}}": datetime.now().strftime("%d/%m/%Y"),
+    }
+    
+    for key, value in replacements.items():
+        conteudo = conteudo.replace(key, str(value))
+    
+    # Criar contrato
+    contrato_obj = Contrato(
+        aluno_id=contrato.aluno_id,
+        aluno_nome=aluno["nome"],
+        template_id=contrato.template_id,
+        template_nome=template["nome"],
+        plano_id=contrato.plano_id,
+        plano_nome=plano_nome,
+        numero_contrato=numero_contrato,
+        valor_total=contrato.valor_total,
+        valor_mensal=contrato.valor_mensal,
+        data_inicio=contrato.data_inicio,
+        data_fim=contrato.data_fim,
+        duracao_meses=contrato.duracao_meses,
+        conteudo_gerado=conteudo,
+        renovacao_automatica=contrato.renovacao_automatica,
+        dia_vencimento=contrato.dia_vencimento
+    )
+    
+    doc = contrato_obj.model_dump()
+    doc['criado_em'] = doc['criado_em'].isoformat()
+    doc['atualizado_em'] = doc['atualizado_em'].isoformat()
+    
+    await db.contratos.insert_one(doc)
+    return contrato_obj
+
+@api_router.get("/contratos", response_model=List[Contrato])
+async def listar_contratos(
+    aluno_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Listar contratos"""
+    query = {}
+    if aluno_id:
+        query["aluno_id"] = aluno_id
+    if status:
+        query["status"] = status
+    
+    contratos = await db.contratos.find(query, {"_id": 0}).sort("criado_em", -1).to_list(1000)
+    for c in contratos:
+        if isinstance(c.get('criado_em'), str):
+            c['criado_em'] = datetime.fromisoformat(c['criado_em'])
+        if isinstance(c.get('atualizado_em'), str):
+            c['atualizado_em'] = datetime.fromisoformat(c['atualizado_em'])
+        if c.get('data_assinatura') and isinstance(c['data_assinatura'], str):
+            c['data_assinatura'] = datetime.fromisoformat(c['data_assinatura'])
+        if c.get('data_email') and isinstance(c['data_email'], str):
+            c['data_email'] = datetime.fromisoformat(c['data_email'])
+    return contratos
+
+@api_router.get("/contratos/vencendo/{dias}")
+async def contratos_vencendo(
+    dias: int,
+    current_user: User = Depends(get_current_user)
+):
+    """Listar contratos que vencem em X dias"""
+    data_limite = (datetime.now() + timedelta(days=dias)).strftime("%Y-%m-%d")
+    hoje = datetime.now().strftime("%Y-%m-%d")
+    
+    contratos = await db.contratos.find({
+        "status": {"$in": ["assinado", "ativo"]},
+        "data_fim": {"$lte": data_limite, "$gte": hoje}
+    }, {"_id": 0}).to_list(100)
+    
+    for c in contratos:
+        if isinstance(c.get('criado_em'), str):
+            c['criado_em'] = datetime.fromisoformat(c['criado_em'])
+        if isinstance(c.get('atualizado_em'), str):
+            c['atualizado_em'] = datetime.fromisoformat(c['atualizado_em'])
+    
+    return contratos
+
+@api_router.get("/contratos/{id}", response_model=Contrato)
+async def obter_contrato(
+    id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Obter contrato específico"""
+    contrato = await db.contratos.find_one({"id": id}, {"_id": 0})
+    if not contrato:
+        raise HTTPException(404, "Contrato não encontrado")
+    
+    if isinstance(contrato.get('criado_em'), str):
+        contrato['criado_em'] = datetime.fromisoformat(contrato['criado_em'])
+    if isinstance(contrato.get('atualizado_em'), str):
+        contrato['atualizado_em'] = datetime.fromisoformat(contrato['atualizado_em'])
+    if contrato.get('data_assinatura') and isinstance(contrato['data_assinatura'], str):
+        contrato['data_assinatura'] = datetime.fromisoformat(contrato['data_assinatura'])
+    if contrato.get('data_email') and isinstance(contrato['data_email'], str):
+        contrato['data_email'] = datetime.fromisoformat(contrato['data_email'])
+    
+    return Contrato(**contrato)
+
+@api_router.post("/contratos/{id}/assinar", response_model=Contrato)
+async def assinar_contrato(
+    id: str,
+    assinatura: ContratoAssinar,
+    current_user: User = Depends(get_current_user)
+):
+    """Assinar contrato digitalmente"""
+    contrato = await db.contratos.find_one({"id": id}, {"_id": 0})
+    if not contrato:
+        raise HTTPException(404, "Contrato não encontrado")
+    
+    if contrato["status"] == "assinado":
+        raise HTTPException(400, "Contrato já foi assinado")
+    
+    # Atualizar com assinatura
+    now = datetime.now(timezone.utc)
+    await db.contratos.update_one(
+        {"id": id},
+        {"$set": {
+            "assinatura_aluno": assinatura.assinatura_aluno,
+            "assinatura_responsavel": assinatura.assinatura_responsavel,
+            "data_assinatura": now.isoformat(),
+            "ip_assinatura": assinatura.ip_address,
+            "status": "assinado",
+            "atualizado_em": now.isoformat()
+        }}
+    )
+    
+    updated = await db.contratos.find_one({"id": id}, {"_id": 0})
+    if isinstance(updated.get('criado_em'), str):
+        updated['criado_em'] = datetime.fromisoformat(updated['criado_em'])
+    if isinstance(updated.get('atualizado_em'), str):
+        updated['atualizado_em'] = datetime.fromisoformat(updated['atualizado_em'])
+    if updated.get('data_assinatura') and isinstance(updated['data_assinatura'], str):
+        updated['data_assinatura'] = datetime.fromisoformat(updated['data_assinatura'])
+    
+    return Contrato(**updated)
+
+@api_router.post("/contratos/{id}/enviar-email")
+async def enviar_contrato_email(
+    id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Enviar contrato por email"""
+    contrato = await db.contratos.find_one({"id": id}, {"_id": 0})
+    if not contrato:
+        raise HTTPException(404, "Contrato não encontrado")
+    
+    # TODO: Implementar envio real de email com integração SMTP/SendGrid
+    # Por enquanto apenas marca como enviado
+    now = datetime.now(timezone.utc)
+    await db.contratos.update_one(
+        {"id": id},
+        {"$set": {
+            "email_enviado": True,
+            "data_email": now.isoformat()
+        }}
+    )
+    
+    return {"message": "Email enviado com sucesso", "data_envio": now.isoformat()}
+
+@api_router.put("/contratos/{id}/status")
+async def atualizar_status_contrato(
+    id: str,
+    novo_status: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Atualizar status do contrato"""
+    valid_status = ["pendente", "assinado", "ativo", "vencido", "cancelado"]
+    if novo_status not in valid_status:
+        raise HTTPException(400, f"Status inválido. Use: {', '.join(valid_status)}")
+    
+    result = await db.contratos.update_one(
+        {"id": id},
+        {"$set": {
+            "status": novo_status,
+            "atualizado_em": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(404, "Contrato não encontrado")
+    
+    return {"message": "Status atualizado com sucesso", "novo_status": novo_status}
+
+@api_router.delete("/contratos/{id}")
+async def deletar_contrato(
+    id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Cancelar contrato"""
+    result = await db.contratos.update_one(
+        {"id": id},
+        {"$set": {
+            "status": "cancelado",
+            "atualizado_em": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(404, "Contrato não encontrado")
+    
+    return {"message": "Contrato cancelado com sucesso"}
+
+
 # ==================== ROOT ROUTES ====================
 
 @api_router.get("/")
@@ -2186,6 +2644,804 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def create_admin_user():
+    """Create default admin user if not exists"""
+    existing = await db.users.find_one({"email": "admin@nextfit.com"})
+    if not existing:
+        admin_user = {
+            "id": str(uuid.uuid4()),
+            "email": "admin@nextfit.com",
+            "nome": "Administrador",
+            "role": "admin",
+            "ativo": True,
+            "senha_hash": pwd_context.hash("admin123"),
+            "criado_em": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(admin_user)
+        logger.info("=" * 50)
+        logger.info("✅ Admin user created!")
+        logger.info("Email: admin@nextfit.com")
+        logger.info("Password: admin123")
+        logger.info("=" * 50)
+    else:
+        logger.info("Admin user already exists")
+
+# ==================== GAMIFICAÇÃO - ENUMS ====================
+
+class TipoConquista(str, Enum):
+    """Categorias de conquistas disponíveis no sistema."""
+    CHECKIN = "checkin"
+    TREINO = "treino"
+    PAGAMENTO = "pagamento"
+    PERMANENCIA = "permanencia"
+    SOCIAL = "social"
+    ESPECIAL = "especial"
+
+class RaridadeConquista(str, Enum):
+    """Níveis de raridade que determinam valor das conquistas."""
+    COMUM = "comum"          # 1-10 pontos
+    INCOMUM = "incomum"      # 11-25 pontos
+    RARO = "raro"            # 26-50 pontos
+    EPICO = "epico"          # 51-100 pontos
+    LENDARIO = "lendario"    # 101+ pontos
+
+# ==================== GAMIFICAÇÃO - MODELS ====================
+
+class Conquista(BaseModel):
+    """
+    Representa uma conquista desbloqueável no sistema.
+    
+    Exemplos:
+    - "Primeiro Passo": 1 check-in (10 pontos)
+    - "Semana de Fogo": 7 check-ins consecutivos (50 pontos)
+    - "Maratonista": 30 treinos no mês (100 pontos)
+    """
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    
+    # Metadados
+    nome: str = Field(..., min_length=3, max_length=100, description="Nome da conquista")
+    descricao: str = Field(..., min_length=10, max_length=500, description="Descrição detalhada")
+    icone: str = Field(default="🏆", description="Emoji ou classe de ícone")
+    tipo: TipoConquista = Field(..., description="Categoria da conquista")
+    raridade: RaridadeConquista = Field(default=RaridadeConquista.COMUM)
+    
+    # Mecânicas
+    criterio: dict = Field(
+        ...,
+        description="Critério de desbloqueio"
+    )
+    pontos: int = Field(..., ge=1, le=1000, description="Pontos concedidos")
+    xp_bonus: int = Field(default=0, ge=0, description="XP bônus adicional")
+    
+    # Requisitos
+    nivel_minimo: int = Field(default=1, ge=1, le=100)
+    conquistas_prerequisitos: List[str] = Field(default_factory=list)
+    
+    # Recompensas
+    recompensa_desconto: Optional[float] = Field(None, ge=0, le=100)
+    recompensa_item: Optional[str] = Field(None, description="Item/brinde físico")
+    
+    # Status
+    ativo: bool = True
+    visivel: bool = True
+    ordem_exibicao: int = 0
+    
+    # Auditoria
+    criado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    criado_por: Optional[str] = None
+    atualizado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ConquistaCreate(BaseModel):
+    """Schema para criação de novas conquistas."""
+    nome: str = Field(..., min_length=3, max_length=100)
+    descricao: str = Field(..., min_length=10, max_length=500)
+    icone: str = "🏆"
+    tipo: TipoConquista
+    raridade: RaridadeConquista = RaridadeConquista.COMUM
+    criterio: dict
+    pontos: int = Field(..., ge=1, le=1000)
+    xp_bonus: int = 0
+    nivel_minimo: int = 1
+    conquistas_prerequisitos: List[str] = []
+    recompensa_desconto: Optional[float] = None
+    recompensa_item: Optional[str] = None
+    visivel: bool = True
+
+class AlunoConquista(BaseModel):
+    """Registro de conquista desbloqueada por um aluno."""
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    aluno_id: str
+    aluno_nome: str
+    conquista_id: str
+    conquista_nome: str
+    conquista_icone: str
+    
+    # Pontuação
+    pontos_ganhos: int
+    xp_ganhos: int = 0
+    
+    # Timestamp
+    data_desbloqueio: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    # Notificação
+    notificado: bool = False
+    visualizado: bool = False
+    
+    # Contexto do desbloqueio
+    contexto: Optional[dict] = None
+
+class PontuacaoAluno(BaseModel):
+    """Perfil de gamificação do aluno com progressão e estatísticas."""
+    model_config = ConfigDict(extra="ignore")
+    
+    aluno_id: str
+    
+    # Progressão
+    pontos_totais: int = 0
+    pontos_mes_atual: int = 0
+    pontos_semana_atual: int = 0
+    
+    nivel: int = 1
+    xp_atual: int = 0
+    xp_proximo_nivel: int = 100
+    progresso_nivel_percent: float = 0.0
+    
+    # Conquistas
+    conquistas_total: int = 0
+    conquistas_mes: int = 0
+    conquistas_ids: List[str] = Field(default_factory=list)
+    
+    # Rankings
+    ranking_geral: Optional[int] = None
+    ranking_mensal: Optional[int] = None
+    
+    # Histórico de pontos (últimos 30 registros)
+    historico_pontos: List[dict] = Field(default_factory=list)
+    
+    # Estatísticas
+    total_checkins: int = 0
+    total_treinos_completos: int = 0
+    sequencia_dias_atual: int = 0
+    sequencia_dias_recorde: int = 0
+    
+    # Timestamps
+    ultimo_checkin: Optional[datetime] = None
+    atualizado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class EventoGamificacao(BaseModel):
+    """Evento disparado que pode desbloquear conquistas."""
+    tipo_evento: str  # "checkin", "treino_completo", "pagamento"
+    aluno_id: str
+    dados_evento: dict = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# ==================== GAMIFICAÇÃO - FUNÇÕES AUXILIARES ====================
+
+async def criar_perfil_gamificacao_inicial(aluno_id: str) -> dict:
+    """Cria perfil inicial de gamificação para novo aluno."""
+    perfil = {
+        "aluno_id": aluno_id,
+        "pontos_totais": 0,
+        "pontos_mes_atual": 0,
+        "pontos_semana_atual": 0,
+        "nivel": 1,
+        "xp_atual": 0,
+        "xp_proximo_nivel": 100,
+        "progresso_nivel_percent": 0.0,
+        "conquistas_total": 0,
+        "conquistas_mes": 0,
+        "conquistas_ids": [],
+        "historico_pontos": [],
+        "total_checkins": 0,
+        "total_treinos_completos": 0,
+        "sequencia_dias_atual": 0,
+        "sequencia_dias_recorde": 0,
+        "atualizado_em": datetime.now(timezone.utc).isoformat()
+    }
+    await db.pontuacao_alunos.insert_one(perfil)
+    return perfil
+
+async def verificar_criterio_conquista(aluno_id: str, criterio: dict) -> bool:
+    """
+    Verifica se um aluno atende ao critério de uma conquista.
+    
+    Critérios suportados:
+    - checkins_total: Total de check-ins realizados
+    - checkins_consecutivos: Dias consecutivos de check-in
+    - checkins_mes: Check-ins no mês atual
+    - treinos_total: Total de treinos registrados
+    - treinos_mes: Treinos no mês atual
+    - pagamentos_dia: Pagamentos em dia consecutivos
+    - meses_ativo: Tempo de cadastro em meses
+    - indicacoes: Número de amigos indicados
+    """
+    tipo = criterio.get("tipo")
+    quantidade = criterio.get("quantidade", 0)
+    
+    if tipo == "checkins_total":
+        count = await db.checkins.count_documents({"aluno_id": aluno_id})
+        return count >= quantidade
+    
+    elif tipo == "checkins_consecutivos":
+        perfil = await db.pontuacao_alunos.find_one({"aluno_id": aluno_id})
+        if perfil:
+            return perfil.get("sequencia_dias_atual", 0) >= quantidade
+        return False
+    
+    elif tipo == "checkins_mes":
+        inicio_mes = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        count = await db.checkins.count_documents({
+            "aluno_id": aluno_id,
+            "data_checkin": {"$gte": inicio_mes.isoformat()}
+        })
+        return count >= quantidade
+    
+    elif tipo == "treinos_total":
+        count = await db.registros_treino.count_documents({"aluno_id": aluno_id})
+        return count >= quantidade
+    
+    elif tipo == "treinos_mes":
+        inicio_mes = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        count = await db.registros_treino.count_documents({
+            "aluno_id": aluno_id,
+            "data_treino": {"$gte": inicio_mes.isoformat()}
+        })
+        return count >= quantidade
+    
+    elif tipo == "pagamentos_dia":
+        pagamentos = await db.pagamentos.find({
+            "aluno_id": aluno_id,
+            "status": "pago"
+        }).sort("data_pagamento", -1).limit(quantidade).to_list(quantidade)
+        
+        if len(pagamentos) < quantidade:
+            return False
+        
+        for pag in pagamentos:
+            data_pag = pag.get("data_pagamento")
+            data_venc = pag.get("data_vencimento")
+            if data_pag and data_venc:
+                if isinstance(data_pag, str):
+                    data_pag = datetime.fromisoformat(data_pag)
+                if isinstance(data_venc, str):
+                    data_venc = datetime.fromisoformat(data_venc)
+                if data_pag > data_venc:
+                    return False
+        return True
+    
+    elif tipo == "meses_ativo":
+        aluno = await db.alunos.find_one({"id": aluno_id})
+        if aluno:
+            cadastro = aluno.get("data_matricula") or aluno.get("criado_em")
+            if cadastro:
+                if isinstance(cadastro, str):
+                    cadastro = datetime.fromisoformat(cadastro)
+                meses = (datetime.now(timezone.utc) - cadastro).days / 30
+                return meses >= quantidade
+        return False
+    
+    elif tipo == "indicacoes":
+        count = await db.alunos.count_documents({"indicado_por": aluno_id})
+        return count >= quantidade
+    
+    elif tipo == "easter_egg":
+        # Conquistas secretas são desbloqueadas manualmente
+        return False
+    
+    return False
+
+async def desbloquear_conquista(aluno_id: str, aluno_nome: str, conquista: dict) -> dict:
+    """Desbloqueia uma conquista para o aluno e adiciona pontos."""
+    
+    aluno_conquista = {
+        "id": str(uuid.uuid4()),
+        "aluno_id": aluno_id,
+        "aluno_nome": aluno_nome,
+        "conquista_id": conquista["id"],
+        "conquista_nome": conquista["nome"],
+        "conquista_icone": conquista.get("icone", "🏆"),
+        "pontos_ganhos": conquista["pontos"],
+        "xp_ganhos": conquista.get("xp_bonus", 0),
+        "data_desbloqueio": datetime.now(timezone.utc).isoformat(),
+        "notificado": False,
+        "visualizado": False
+    }
+    
+    await db.alunos_conquistas.insert_one(aluno_conquista)
+    
+    # Adicionar pontos ao perfil
+    await adicionar_pontos_aluno(
+        aluno_id=aluno_id,
+        pontos=conquista["pontos"],
+        xp=conquista.get("xp_bonus", 0),
+        motivo=f"Conquista desbloqueada: {conquista['nome']}",
+        conquista_id=conquista["id"]
+    )
+    
+    # Incrementar contador de conquistas
+    await db.pontuacao_alunos.update_one(
+        {"aluno_id": aluno_id},
+        {
+            "$inc": {"conquistas_total": 1, "conquistas_mes": 1},
+            "$push": {"conquistas_ids": conquista["id"]}
+        }
+    )
+    
+    logger.info(f"🏆 Conquista desbloqueada: {conquista['nome']} para aluno {aluno_id}")
+    return aluno_conquista
+
+async def adicionar_pontos_aluno(
+    aluno_id: str, 
+    pontos: int, 
+    xp: int = 0,
+    motivo: str = "", 
+    conquista_id: Optional[str] = None,
+    contexto: Optional[dict] = None
+):
+    """Adiciona pontos e XP ao perfil do aluno."""
+    
+    xp_total = xp if xp > 0 else pontos
+    
+    update_doc = {
+        "$inc": {
+            "pontos_totais": pontos,
+            "pontos_mes_atual": pontos,
+            "pontos_semana_atual": pontos,
+            "xp_atual": xp_total
+        },
+        "$push": {
+            "historico_pontos": {
+                "$each": [{
+                    "data": datetime.now(timezone.utc).isoformat(),
+                    "pontos": pontos,
+                    "xp": xp_total,
+                    "motivo": motivo,
+                    "conquista_id": conquista_id
+                }],
+                "$slice": -30
+            }
+        },
+        "$set": {
+            "atualizado_em": datetime.now(timezone.utc).isoformat()
+        }
+    }
+    
+    await db.pontuacao_alunos.update_one(
+        {"aluno_id": aluno_id},
+        update_doc,
+        upsert=True
+    )
+    
+    await verificar_nivel_aluno(aluno_id)
+
+async def verificar_nivel_aluno(aluno_id: str):
+    """Verifica e atualiza o nível do aluno baseado no XP."""
+    perfil = await db.pontuacao_alunos.find_one({"aluno_id": aluno_id})
+    if not perfil:
+        return
+    
+    xp_atual = perfil.get("xp_atual", 0)
+    nivel_atual = perfil.get("nivel", 1)
+    
+    def xp_para_nivel(nivel):
+        return int(100 * (1.5 ** (nivel - 1)))
+    
+    novo_nivel = nivel_atual
+    xp_proximo = xp_para_nivel(novo_nivel)
+    
+    while xp_atual >= xp_proximo and novo_nivel < 100:
+        novo_nivel += 1
+        xp_proximo = xp_para_nivel(novo_nivel)
+    
+    if novo_nivel > nivel_atual:
+        progresso = (xp_atual / xp_proximo) * 100 if xp_proximo > 0 else 0
+        
+        await db.pontuacao_alunos.update_one(
+            {"aluno_id": aluno_id},
+            {
+                "$set": {
+                    "nivel": novo_nivel,
+                    "xp_proximo_nivel": xp_proximo,
+                    "progresso_nivel_percent": round(progresso, 2)
+                }
+            }
+        )
+        logger.info(f"⬆️ Aluno {aluno_id} subiu para nível {novo_nivel}!")
+
+async def atualizar_sequencia_checkins(aluno_id: str):
+    """Atualiza a sequência de dias consecutivos de check-in."""
+    perfil = await db.pontuacao_alunos.find_one({"aluno_id": aluno_id})
+    if not perfil:
+        return
+    
+    ultimo_checkin = perfil.get("ultimo_checkin")
+    sequencia_atual = perfil.get("sequencia_dias_atual", 0)
+    sequencia_recorde = perfil.get("sequencia_dias_recorde", 0)
+    
+    hoje = datetime.now(timezone.utc).date()
+    
+    if ultimo_checkin:
+        if isinstance(ultimo_checkin, str):
+            ultimo_checkin = datetime.fromisoformat(ultimo_checkin)
+        ultimo_dia = ultimo_checkin.date()
+        diff = (hoje - ultimo_dia).days
+        
+        if diff == 1:
+            # Dia consecutivo!
+            sequencia_atual += 1
+        elif diff > 1:
+            # Quebrou a sequência
+            sequencia_atual = 1
+        # Se diff == 0, já fez check-in hoje, mantém
+    else:
+        sequencia_atual = 1
+    
+    if sequencia_atual > sequencia_recorde:
+        sequencia_recorde = sequencia_atual
+    
+    await db.pontuacao_alunos.update_one(
+        {"aluno_id": aluno_id},
+        {
+            "$set": {
+                "ultimo_checkin": datetime.now(timezone.utc).isoformat(),
+                "sequencia_dias_atual": sequencia_atual,
+                "sequencia_dias_recorde": sequencia_recorde
+            },
+            "$inc": {"total_checkins": 1}
+        },
+        upsert=True
+    )
+
+# ==================== GAMIFICAÇÃO - ENDPOINTS ====================
+
+@api_router.get("/gamificacao/conquistas")
+async def listar_conquistas(
+    tipo: Optional[str] = None,
+    raridade: Optional[str] = None,
+    visiveis_apenas: bool = True,
+    current_user: User = Depends(get_current_user)
+):
+    """Lista todas as conquistas disponíveis no sistema."""
+    query = {"ativo": True}
+    
+    if tipo:
+        query["tipo"] = tipo
+    if raridade:
+        query["raridade"] = raridade
+    if visiveis_apenas:
+        query["visivel"] = True
+    
+    conquistas = await db.conquistas.find(query, {"_id": 0}).sort("ordem_exibicao", 1).to_list(1000)
+    return conquistas
+
+@api_router.post("/gamificacao/conquistas")
+async def criar_conquista(
+    conquista: ConquistaCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Cria nova conquista (apenas admins)."""
+    if current_user.role != "admin":
+        raise HTTPException(403, "Apenas administradores podem criar conquistas")
+    
+    conquista_dict = conquista.model_dump()
+    conquista_dict["id"] = str(uuid.uuid4())
+    conquista_dict["criado_em"] = datetime.now(timezone.utc).isoformat()
+    conquista_dict["criado_por"] = current_user.id
+    conquista_dict["atualizado_em"] = datetime.now(timezone.utc).isoformat()
+    conquista_dict["ativo"] = True
+    conquista_dict["ordem_exibicao"] = 0
+    
+    await db.conquistas.insert_one(conquista_dict)
+    return conquista_dict
+
+@api_router.put("/gamificacao/conquistas/{conquista_id}")
+async def atualizar_conquista(
+    conquista_id: str,
+    dados: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Atualiza uma conquista existente (apenas admins)."""
+    if current_user.role != "admin":
+        raise HTTPException(403, "Apenas administradores podem atualizar conquistas")
+    
+    dados["atualizado_em"] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.conquistas.update_one(
+        {"id": conquista_id},
+        {"$set": dados}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(404, "Conquista não encontrada")
+    
+    return {"message": "Conquista atualizada com sucesso"}
+
+@api_router.delete("/gamificacao/conquistas/{conquista_id}")
+async def deletar_conquista(
+    conquista_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Desativa uma conquista (soft delete)."""
+    if current_user.role != "admin":
+        raise HTTPException(403, "Apenas administradores podem deletar conquistas")
+    
+    result = await db.conquistas.update_one(
+        {"id": conquista_id},
+        {"$set": {"ativo": False, "atualizado_em": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(404, "Conquista não encontrada")
+    
+    return {"message": "Conquista desativada com sucesso"}
+
+@api_router.get("/gamificacao/aluno/{aluno_id}")
+async def obter_perfil_gamificacao(
+    aluno_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Obtém o perfil completo de gamificação do aluno."""
+    perfil = await db.pontuacao_alunos.find_one({"aluno_id": aluno_id}, {"_id": 0})
+    
+    if not perfil:
+        perfil = await criar_perfil_gamificacao_inicial(aluno_id)
+    
+    # Converter datas se necessário
+    if isinstance(perfil.get("atualizado_em"), str):
+        perfil["atualizado_em"] = datetime.fromisoformat(perfil["atualizado_em"])
+    if isinstance(perfil.get("ultimo_checkin"), str):
+        perfil["ultimo_checkin"] = datetime.fromisoformat(perfil["ultimo_checkin"])
+    
+    return perfil
+
+@api_router.get("/gamificacao/aluno/{aluno_id}/conquistas")
+async def listar_conquistas_aluno(
+    aluno_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Lista todas as conquistas desbloqueadas pelo aluno."""
+    conquistas = await db.alunos_conquistas.find(
+        {"aluno_id": aluno_id}, {"_id": 0}
+    ).sort("data_desbloqueio", -1).to_list(1000)
+    
+    return conquistas
+
+@api_router.post("/gamificacao/aluno/{aluno_id}/verificar-conquistas")
+async def verificar_conquistas_aluno(
+    aluno_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Verifica e desbloqueia conquistas pendentes do aluno."""
+    # Buscar aluno
+    aluno = await db.alunos.find_one({"id": aluno_id})
+    if not aluno:
+        raise HTTPException(404, "Aluno não encontrado")
+    
+    # Buscar perfil de gamificação
+    perfil = await db.pontuacao_alunos.find_one({"aluno_id": aluno_id})
+    if not perfil:
+        perfil = await criar_perfil_gamificacao_inicial(aluno_id)
+    
+    # Buscar conquistas já desbloqueadas
+    conquistas_desbloqueadas = await db.alunos_conquistas.find(
+        {"aluno_id": aluno_id}
+    ).to_list(1000)
+    conquistas_ids_desbloqueadas = {c["conquista_id"] for c in conquistas_desbloqueadas}
+    
+    # Buscar todas conquistas ativas
+    todas_conquistas = await db.conquistas.find({"ativo": True}).to_list(1000)
+    
+    novas_conquistas = []
+    
+    for conquista in todas_conquistas:
+        if conquista["id"] in conquistas_ids_desbloqueadas:
+            continue
+        
+        if perfil.get("nivel", 1) < conquista.get("nivel_minimo", 1):
+            continue
+        
+        prerequisitos = conquista.get("conquistas_prerequisitos", [])
+        if not all(p in conquistas_ids_desbloqueadas for p in prerequisitos):
+            continue
+        
+        if await verificar_criterio_conquista(aluno_id, conquista.get("criterio", {})):
+            nova_conquista = await desbloquear_conquista(
+                aluno_id, 
+                aluno.get("nome", "Aluno"), 
+                conquista
+            )
+            novas_conquistas.append(nova_conquista)
+    
+    return {
+        "novas_conquistas": novas_conquistas,
+        "total_desbloqueadas": len(novas_conquistas)
+    }
+
+@api_router.get("/gamificacao/ranking")
+async def obter_ranking(
+    periodo: str = "geral",
+    limite: int = 100,
+    current_user: User = Depends(get_current_user)
+):
+    """Retorna o ranking de alunos por pontuação."""
+    if periodo == "mensal":
+        campo_pontos = "pontos_mes_atual"
+    elif periodo == "semanal":
+        campo_pontos = "pontos_semana_atual"
+    else:
+        campo_pontos = "pontos_totais"
+    
+    pipeline = [
+        {"$match": {campo_pontos: {"$gt": 0}}},
+        {"$sort": {campo_pontos: -1}},
+        {"$limit": limite}
+    ]
+    
+    ranking = await db.pontuacao_alunos.aggregate(pipeline).to_list(limite)
+    
+    resultado = []
+    for idx, perfil in enumerate(ranking, 1):
+        aluno = await db.alunos.find_one({"id": perfil["aluno_id"]}, {"_id": 0})
+        if aluno:
+            resultado.append({
+                "posicao": idx,
+                "aluno_id": perfil["aluno_id"],
+                "aluno_nome": aluno.get("nome"),
+                "aluno_foto": aluno.get("foto_url"),
+                "pontos": perfil.get(campo_pontos, 0),
+                "nivel": perfil.get("nivel", 1),
+                "conquistas_total": perfil.get("conquistas_total", 0)
+            })
+    
+    return {
+        "periodo": periodo,
+        "ranking": resultado,
+        "total_participantes": len(resultado)
+    }
+
+@api_router.post("/gamificacao/evento")
+async def processar_evento_gamificacao(
+    evento: EventoGamificacao,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Processa um evento de gamificação e atualiza pontuação/conquistas.
+    
+    Eventos suportados:
+    - checkin: Aluno fez check-in
+    - treino_completo: Aluno completou treino
+    - pagamento: Pagamento realizado
+    - avaliacao: Nova avaliação física
+    """
+    pontos_base = {
+        "checkin": 5,
+        "treino_completo": 10,
+        "pagamento": 15,
+        "avaliacao": 20
+    }
+    
+    pontos = pontos_base.get(evento.tipo_evento, 0)
+    
+    # Atualizar sequência de check-ins
+    if evento.tipo_evento == "checkin":
+        await atualizar_sequencia_checkins(evento.aluno_id)
+    
+    if pontos > 0:
+        await adicionar_pontos_aluno(
+            aluno_id=evento.aluno_id,
+            pontos=pontos,
+            motivo=f"Evento: {evento.tipo_evento}",
+            contexto=evento.dados_evento
+        )
+    
+    # Buscar aluno para verificar conquistas
+    aluno = await db.alunos.find_one({"id": evento.aluno_id})
+    if not aluno:
+        return {"pontos_adicionados": pontos, "novas_conquistas": [], "message": "Evento processado"}
+    
+    # Verificar conquistas
+    perfil = await db.pontuacao_alunos.find_one({"aluno_id": evento.aluno_id})
+    if not perfil:
+        perfil = await criar_perfil_gamificacao_inicial(evento.aluno_id)
+    
+    conquistas_desbloqueadas = await db.alunos_conquistas.find(
+        {"aluno_id": evento.aluno_id}
+    ).to_list(1000)
+    conquistas_ids_desbloqueadas = {c["conquista_id"] for c in conquistas_desbloqueadas}
+    
+    todas_conquistas = await db.conquistas.find({"ativo": True}).to_list(1000)
+    
+    novas_conquistas = []
+    
+    for conquista in todas_conquistas:
+        if conquista["id"] in conquistas_ids_desbloqueadas:
+            continue
+        
+        if perfil.get("nivel", 1) < conquista.get("nivel_minimo", 1):
+            continue
+        
+        prerequisitos = conquista.get("conquistas_prerequisitos", [])
+        if not all(p in conquistas_ids_desbloqueadas for p in prerequisitos):
+            continue
+        
+        if await verificar_criterio_conquista(evento.aluno_id, conquista.get("criterio", {})):
+            nova_conquista = await desbloquear_conquista(
+                evento.aluno_id, 
+                aluno.get("nome", "Aluno"), 
+                conquista
+            )
+            novas_conquistas.append(nova_conquista)
+            conquistas_ids_desbloqueadas.add(conquista["id"])
+    
+    return {
+        "pontos_adicionados": pontos,
+        "novas_conquistas": novas_conquistas,
+        "message": "Evento processado com sucesso"
+    }
+
+@api_router.get("/gamificacao/estatisticas")
+async def obter_estatisticas_gamificacao(
+    current_user: User = Depends(get_current_user)
+):
+    """Retorna estatísticas gerais do sistema de gamificação."""
+    
+    total_conquistas = await db.conquistas.count_documents({"ativo": True})
+    total_desbloqueadas = await db.alunos_conquistas.count_documents({})
+    
+    # Top 5 conquistas mais desbloqueadas
+    pipeline_top = [
+        {"$group": {"_id": "$conquista_id", "count": {"$sum": 1}, "nome": {"$first": "$conquista_nome"}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 5}
+    ]
+    top_conquistas = await db.alunos_conquistas.aggregate(pipeline_top).to_list(5)
+    
+    # Média de pontos por aluno
+    pipeline_media = [
+        {"$group": {"_id": None, "media": {"$avg": "$pontos_totais"}}}
+    ]
+    media_result = await db.pontuacao_alunos.aggregate(pipeline_media).to_list(1)
+    media_pontos = media_result[0]["media"] if media_result else 0
+    
+    alunos_participando = await db.pontuacao_alunos.count_documents({"pontos_totais": {"$gt": 0}})
+    
+    return {
+        "total_conquistas": total_conquistas,
+        "total_desbloqueadas": total_desbloqueadas,
+        "top_conquistas": top_conquistas,
+        "media_pontos_por_aluno": round(media_pontos, 2) if media_pontos else 0,
+        "alunos_participando": alunos_participando
+    }
+
+@api_router.post("/gamificacao/aluno/{aluno_id}/marcar-notificacao-vista")
+async def marcar_notificacoes_vistas(
+    aluno_id: str,
+    conquista_ids: List[str],
+    current_user: User = Depends(get_current_user)
+):
+    """Marca conquistas como notificadas/visualizadas."""
+    await db.alunos_conquistas.update_many(
+        {"aluno_id": aluno_id, "conquista_id": {"$in": conquista_ids}},
+        {"$set": {"notificado": True, "visualizado": True}}
+    )
+    return {"message": "Notificações marcadas como vistas"}
+
+@api_router.get("/gamificacao/aluno/{aluno_id}/conquistas-pendentes")
+async def obter_conquistas_pendentes(
+    aluno_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Retorna conquistas não visualizadas do aluno (para notificações)."""
+    conquistas = await db.alunos_conquistas.find(
+        {"aluno_id": aluno_id, "visualizado": False}, {"_id": 0}
+    ).to_list(100)
+    return conquistas
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

@@ -12,7 +12,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:7777';
 
 const RegistrarTreino = () => {
   const navigate = useNavigate();
